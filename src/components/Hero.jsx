@@ -13,7 +13,7 @@ import {
   useReducedMotion,
 } from 'motion/react'
 import ChromaVideo from './ChromaVideo.jsx'
-import { startPreload, usePreload } from '../preload.js'
+import { settle, startPreload, usePreload } from '../preload.js'
 import { shop } from '../data.js'
 import tracks from '../fishTracks.json'
 import { asset } from '../asset.js'
@@ -78,6 +78,13 @@ export default function Hero({ onStart }) {
   const pageVisible = usePageInView()
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] })
 
+  // The fish clips are the heaviest part of the first screen: start them right away,
+  // alongside the dive frames, so the first fish is ready when the dive ends.
+  useEffect(() => {
+    if (reduce) settle() // static fish: nothing heavy to wait for
+    else startPreload()
+  }, [reduce])
+
   // Start as soon as the dive frames are decoded (or after MAX_WAIT_MS at worst).
   useEffect(() => {
     let alive = true
@@ -95,9 +102,7 @@ export default function Hero({ onStart }) {
   }, [reduce])
 
   useEffect(() => {
-    if (!play) return
-    onStart?.()
-    startPreload() // fish clips download behind the dive
+    if (play) onStart?.()
   }, [play, onStart])
 
   const travel = useMotionValue(reduce ? 1 : 0)
@@ -224,7 +229,7 @@ export default function Hero({ onStart }) {
           animate={play ? { opacity: 1, y: 0 } : undefined}
           transition={{ delay: reduce ? 0 : T.kicker, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
-          Магазин аквариумистики · {shop.city}
+          Выставка — магазин
         </motion.p>
         <motion.h1
           ref={titleRef}
@@ -260,27 +265,23 @@ export default function Hero({ onStart }) {
             Живые рыбы, морские кораллы и всё для аквариума — в одном зале в Чебоксарах.
           </motion.p>
           <motion.div className="hero-actions" variants={item}>
-            <motion.a href="#shop" className="btn btn-primary" whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}>
-              Смотреть витрину
+            <motion.a href="#builder" className="btn btn-primary" whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}>
+              Собрать аквариум
             </motion.a>
-            <motion.a href="#visit" className="btn btn-glass" whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}>
-              Как нас найти
+            <motion.a href="#booking" className="btn btn-glass" whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}>
+              Записаться на выставку
             </motion.a>
           </motion.div>
           <motion.ul className="hero-facts" variants={item}>
             <li>
               <span>Адрес</span>
               <a href={shop.routeUrl} target="_blank" rel="noopener">
-                {shop.address}
+                {shop.addressFull}
               </a>
             </li>
             <li>
               <span>Телефон</span>
               <a href={shop.phoneHref}>{shop.phone}</a>
-            </li>
-            <li>
-              <span>Часы</span>
-              уточняйте по телефону
             </li>
           </motion.ul>
         </motion.div>
@@ -485,8 +486,13 @@ function layout(pass, hero, title, jitter) {
 }
 
 function FishSwim({ heroRef, titleRef, start, reduce }) {
-  const { clips, done } = usePreload()
+  const { clips } = usePreload()
+  const clipsRef = useRef(clips)
+  clipsRef.current = clips
   const qa = useRef(readQa()).current
+  // The first pass waits only for the clip it needs; later passes use whatever is loaded.
+  const firstClip = qa ? qa.clip : SCRIPT[0].clip
+  const firstReady = !!clips[firstClip]
   const [pass, setPass] = useState(null)
   const [visible, setVisible] = useState(false)
   const index = useRef(0)
@@ -522,6 +528,8 @@ function FishSwim({ heroRef, titleRef, start, reduce }) {
     const g = geometry()
     if (!g) return
     const spec = { ...(qa ?? nextPass(index.current, history.current)), jitter: qa ? 0 : Math.random() - 0.5 }
+    if (!clipsRef.current[spec.clip]) spec.clip = clipsRef.current.findIndex(Boolean)
+    if (spec.clip < 0) return
     history.current.push(spec)
     index.current += 1
     setPass({ ...spec, box: layout(spec, g.hero, g.title, spec.jitter), token: index.current })
@@ -532,13 +540,13 @@ function FishSwim({ heroRef, titleRef, start, reduce }) {
     if (start && !startedAt.current) startedAt.current = performance.now()
   }, [start])
 
-  // First pass: after the intro, and only once both clips are fully in memory.
+  // First pass: after the intro, as soon as its clip is fully in memory.
   useEffect(() => {
-    if (!start || reduce || !done || index.current > 0) return
+    if (!start || reduce || !firstReady || index.current > 0) return
     const wait = qa ? 50 : Math.max(0, T.fish * 1000 - (performance.now() - startedAt.current))
     timer.current = setTimeout(launch, wait)
     return () => clearTimeout(timer.current)
-  }, [start, reduce, done, launch, qa])
+  }, [start, reduce, firstReady, launch, qa])
 
   // On resize, re-place the current pass without restarting its clip.
   useEffect(() => {

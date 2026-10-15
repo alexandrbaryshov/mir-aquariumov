@@ -9,6 +9,7 @@ import {
   useInView,
 } from 'motion/react'
 import { halls } from '../data.js'
+import { usePreload } from '../preload.js'
 
 /**
  * Horizontal carousel driven by ← / → buttons (plus swipe, trackpad and arrow keys).
@@ -133,10 +134,14 @@ function HallCard({ hall, active }) {
   const rotateX = useSpring(rx, { stiffness: 180, damping: 18 })
   const rotateY = useSpring(ry, { stiffness: 180, damping: 18 })
   const glareX = useTransform(rotateY, [-8, 8], ['20%', '80%'])
-  // The reef video (3.5 MB) only starts downloading once its card is near the viewport,
+  // The reef video (~1 MB) only starts downloading once its card is near the viewport,
   // so it doesn't compete with the hero fish clips on first load.
   const videoRef = useRef(null)
   const nearView = useInView(videoRef, { once: true, margin: '0px 400px 200px 400px' })
+  // Cards sit just below the first screen, inside the browser's lazy-load distance:
+  // hold their images until the hero fish is in memory (or the visitor scrolls).
+  const { settled } = usePreload()
+  const img = settled ? hall.img : undefined
 
   const onMove = (e) => {
     if (e.pointerType !== 'mouse') return
@@ -162,8 +167,8 @@ function HallCard({ hall, active }) {
         {hall.video ? (
           <motion.video
             ref={videoRef}
-            src={nearView ? hall.video : undefined}
-            poster={hall.img}
+            src={settled && nearView ? hall.video : undefined}
+            poster={img}
             muted
             loop
             autoPlay
@@ -174,7 +179,7 @@ function HallCard({ hall, active }) {
           />
         ) : (
           <motion.img
-            src={hall.img}
+            src={img}
             alt=""
             loading="lazy"
             variants={{ rest: { scale: 1 }, hover: { scale: 1.06 } }}

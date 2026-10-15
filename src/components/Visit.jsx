@@ -125,7 +125,7 @@ export default function Visit({ lines, onBooked }) {
           </div>
         </div>
 
-        <div className="visit-card">
+        <div className="visit-card" id="booking">
           <AnimatePresence mode="wait" initial={false}>
             {status === 'success' ? (
               <motion.div

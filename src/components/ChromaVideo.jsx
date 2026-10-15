@@ -46,7 +46,7 @@ function frameLoop(getVideo, render) {
  * Plays green-screen clips through a chroma key (WebGL, or a 2D-canvas fallback)
  * so the subject can be layered over the page.
  *
- * - `sources`: clip URLs, all preloaded as hidden <video> elements;
+ * - `sources`: clip URLs, all preloaded as hidden <video> elements (null = not loaded yet);
  * - `active` + `token`: which clip to play; bump `token` to (re)start it from 0;
  * - `seek`: QA hook, show a frozen frame at this time instead of playing;
  * - `onEnded`: fires when the active clip finishes (clips don't loop).
@@ -136,7 +136,7 @@ export default function ChromaVideo({ sources, active = 0, token = 0, seek = nul
       {/* Source videos live in a tiny fixed box that is always "on screen":
           Chrome pauses muted autoplay videos it considers invisible/offscreen. */}
       {createPortal(
-        sources.map((src, i) => (
+        sources.map((src, i) => src && (
           <video
             key={src}
             ref={(el) => (videoRefs.current[i] = el)}

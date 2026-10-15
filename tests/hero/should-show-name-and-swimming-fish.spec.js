@@ -7,9 +7,13 @@ test.describe('Главный экран', () => {
     // 1. После погружения видны название и плашка с кнопками
     await expect(page.getByRole('heading', { level: 1, name: 'Мир аквариумов' })).toBeVisible()
     await expect(page.getByTestId('hero-name')).toHaveCSS('opacity', '1', { timeout: 5_000 })
-    await expect(page.getByRole('link', { name: 'Смотреть витрину' })).toBeVisible()
-    await expect(page.locator('.hero-facts')).toContainText('просп. Ленина, 27')
+    await expect(page.locator('.hero-kicker')).toHaveText('Выставка — магазин')
+    await expect(page.getByRole('link', { name: 'Собрать аквариум' })).toHaveAttribute('href', '#builder')
+    await expect(page.getByRole('link', { name: 'Записаться на выставку' })).toHaveAttribute('href', '#booking')
+    await expect(page.locator('.hero-actions a')).toHaveCount(2)
+    await expect(page.locator('.hero-facts')).toContainText('Чебоксары, просп. Ленина, 27')
     await expect(page.locator('.hero-facts')).toContainText('+7 (8352) 57-19-55')
+    await expect(page.locator('.hero-facts')).not.toContainText('Часы')
 
     // 2. После интро выплывает рыба
     const fish = page.getByTestId('hero-fish')
