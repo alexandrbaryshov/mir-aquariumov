@@ -56,11 +56,16 @@ export default function Header({ count, onCartClick, cartButtonRef, theme, setTh
     <>
       <motion.header
         className={'site-header' + (solid ? ' is-solid' : '')}
-        initial={revealed ? false : { y: '-110%' }}
-        animate={{ y: hidden || !revealed ? '-110%' : '0%' }}
+        initial={revealed ? false : { y: '-40%', opacity: 0 }}
+        animate={revealed ? { y: hidden ? '-110%' : '0%', opacity: 1 } : { y: '-40%', opacity: 0 }}
         onFocus={() => setHidden(false)}
-        // First appearance is part of the hero intro (after the logo ripples in).
-        transition={{ type: 'spring', bounce: 0, visualDuration: 0.5, delay: revealed && !wasRevealed.current ? 2.4 : 0 }}
+        // First appearance is part of the hero intro (after the logo ripples in): a slow
+        // fade with a short slide, not the quick drop used when it hides on scroll.
+        transition={
+          revealed && !wasRevealed.current
+            ? { duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 2.4 }
+            : { type: 'spring', bounce: 0, visualDuration: 0.5 }
+        }
         onAnimationComplete={() => {
           if (revealed) wasRevealed.current = true
         }}

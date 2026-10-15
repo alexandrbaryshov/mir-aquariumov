@@ -435,7 +435,6 @@ p {
   background: radial-gradient(ellipse 80% 70% at 50% 45%, #2a8a98, #0b4350);
 }
 .hero-camera {
-  --dof: 40%;
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -457,8 +456,14 @@ p {
 .hero-dof {
   filter: blur(7px) saturate(1.05);
   transform: scale(1.03);
-  -webkit-mask-image: radial-gradient(ellipse 72% 68% at 50% 42%, transparent var(--dof), #000 calc(var(--dof) + 38%));
-  mask-image: radial-gradient(ellipse 72% 68% at 50% 42%, transparent var(--dof), #000 calc(var(--dof) + 38%));
+  -webkit-mask-image: radial-gradient(ellipse 72% 68% at 50% 42%, transparent 40%, #000 78%);
+  mask-image: radial-gradient(ellipse 72% 68% at 50% 42%, transparent 40%, #000 78%);
+}
+/* Start of the dive: out of focus almost to the centre. Fades out as the camera
+   moves in (an opacity animation: the masks themselves never change). */
+.hero-dof.is-start {
+  -webkit-mask-image: radial-gradient(ellipse 72% 68% at 50% 42%, transparent 8%, #000 46%);
+  mask-image: radial-gradient(ellipse 72% 68% at 50% 42%, transparent 8%, #000 46%);
 }
 .hero-torch {
   position: absolute;
@@ -722,6 +727,48 @@ p {
     bottom: 13vh;
   }
 }
+/* «Листайте вниз»: centred between the plaque and the wave. */
+.hero-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 44px;
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.hero-hint-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #0b4a52;
+}
+.hero-hint-arrow {
+  animation: hint-bob 1.8s ease-in-out infinite;
+}
+@keyframes hint-bob {
+  0%,
+  100% {
+    transform: translateY(-2px);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(3px);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-hint-arrow {
+    animation: none;
+  }
+}
 .hero-wave {
   position: absolute;
   bottom: -1px;
@@ -753,6 +800,23 @@ p {
   display: flex;
   width: max-content;
   white-space: nowrap;
+  /* Four copies of the row: one cycle moves the track by exactly one of them.
+     The duration comes from the row's width (Ticker.jsx), for a steady slow pace. */
+  animation: ticker var(--ticker-duration, 70s) linear infinite;
+}
+.ticker-row {
+  display: flex;
+  flex: none;
+}
+@keyframes ticker {
+  to {
+    transform: translateX(-25%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+  }
 }
 .ticker-item {
   display: inline-flex;
@@ -2555,8 +2619,12 @@ p {
   .hero-center {
     padding-top: 96px;
   }
+  /* Leaves room for the scroll hint under the plaque. */
   .hero-bottom {
-    margin-bottom: 52px;
+    margin-bottom: 70px;
+  }
+  .hero-hint {
+    bottom: 38px;
   }
   /* The fish swims behind the plaque on a phone: keep the glass thin and barely
      frosted so it stays visible through it. */

@@ -19,20 +19,27 @@ import tracks from '../fishTracks.json'
 import { asset } from '../asset.js'
 
 // Intro timeline, seconds from the moment the dive starts. The name, kicker and
-// plaque keep their original entrance; they simply wait for the corals to part.
-const T = { logo: 0.95, logoDur: 1.9, kicker: 2.05, plaque: 2.65, fish: 3.6 }
+// plaque wait for the corals to part; the fish only starts once all of them have
+// settled, since starting a clip costs a phone a few frames.
+const T = { logo: 0.95, logoDur: 1.9, kicker: 2.05, plaque: 2.7, fish: 4.2, hint: 4.4 }
+const SOFT = [0.22, 1, 0.36, 1]
 
 /* ───────── Dive-in ─────────
  * One "travel" value (0 → 1) moves the camera forward by DIVE.distance. Every layer
  * sits at its own depth and scales about the vanishing point by d / (d − travel),
  * which is exactly how a forward dolly projects: near corals swell and rush out of
  * frame, mid corals drift past slower, the far plate barely grows.
+ *
+ * The layers move as Web Animations, which run on the compositor: whatever the main
+ * thread is busy with on a phone (decoding, the fish clip starting), the dive can't
+ * stutter. Travel is sampled at even time steps, so the easing lives in the keyframes.
  */
 const DIVE = { duration: 3.6, distance: 0.82, ease: [0.35, 0.1, 0.15, 1] }
 const SIDE = asset('img/coral-side.webp') // tall cluster: frames the gap on the left and right
 const BED = asset('img/coral-bed.webp') // low heads along the bottom
 const INTRO_IMAGES = [asset('img/hero-water.jpg'), SIDE, BED]
 const MAX_WAIT_MS = 2500 // never keep the scene frozen longer than this on a slow network
+const FONT_GRACE_MS = 800 // how long the frames, once ready, may wait for the fonts
 
 const PLATE_DEPTH = 12
 // Far → near. Depth 1 = where the camera ends up after travelling DIVE.distance + a bit.
@@ -44,12 +51,67 @@ const CORALS = [
   { key: 'near-r', depth: 0.86, src: SIDE, cls: 'is-near c-near-r' },
 ]
 const project = (depth) => (t) => depth / (depth - DIVE.distance * t)
+const plateScale = project(PLATE_DEPTH)
+const clamp01 = (v) => Math.min(1, Math.max(0, v))
+
+/** cubic-bezier(x1, y1, x2, y2) as a function of time, solved by bisection. */
+function cubicBezier(x1, y1, x2, y2) {
+  const at = (s, a, b) => 3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3
+  return (x) => {
+    let lo = 0
+    let hi = 1
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2
+      if (at(mid, x1, x2) < x) lo = mid
+      else hi = mid
+    }
+    return at((lo + hi) / 2, y1, y2)
+  }
+}
+const diveEase = cubicBezier(...DIVE.ease)
+const TRAVEL = Array.from({ length: 41 }, (_, i) => diveEase(i / 40))
+const diveFrames = (fn) => TRAVEL.map(fn)
+
+/** Scale with the camera, then fade out on the last stretch while rushing out of frame. */
+function coralFrames(depth) {
+  const p = project(depth)
+  const end = p(1)
+  const from = 1 + (end - 1) * 0.55
+  const to = 1 + (end - 1) * 0.92
+  return diveFrames((t) => ({ transform: `scale(${p(t).toFixed(4)})`, opacity: clamp01((to - p(t)) / (to - from)) }))
+}
+
+/** Share of the dive's duration at which travel reaches `t` (for the ?dive= QA hook). */
+function diveTimeAt(t) {
+  let lo = 0
+  let hi = 1
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2
+    if (diveEase(mid) < t) lo = mid
+    else hi = mid
+  }
+  return (lo + hi) / 2
+}
 
 function decode(src) {
   const img = new Image()
   img.src = src
   return img.decode().catch(() => {})
 }
+
+// Fonts the first screen is set in. The intro waits a little for them, so the name
+// and the plaque don't jump when the web font swaps in mid-animation.
+const INTRO_FONTS = ['500 1em Literata', '400 1em "JetBrains Mono"', '400 1em "Golos Text"', '600 1em "Golos Text"']
+
+function fontsReady() {
+  if (!document.fonts) return Promise.resolve()
+  return Promise.all(INTRO_FONTS.map((f) => document.fonts.load(f, 'Мир аквариумов 0'))).catch(() => {})
+}
+
+// The name ripples in through an SVG filter that is redrawn every frame: cheap on a
+// desktop, but phones (Safari above all) render it on the main thread. Touch screens
+// get a plain fade and settle instead.
+const rippleLogo = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
 const rand = (i, salt) => {
   const x = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453
@@ -64,8 +126,8 @@ const bubbles = Array.from({ length: 14 }, (_, i) => ({
 }))
 
 const item = {
-  hidden: { opacity: 0, y: 14 },
-  shown: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+  hidden: { opacity: 0, y: 10 },
+  shown: { opacity: 1, y: 0, transition: { duration: 0.9, ease: SOFT } },
 }
 
 export default function Hero({ onStart }) {
@@ -76,7 +138,11 @@ export default function Hero({ onStart }) {
   const [diveDone, setDiveDone] = useState(false)
   const inView = useInView(ref, { amount: 0.05 })
   const pageVisible = usePageInView()
-  const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] })
+  const { scrollYProgress: viewProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] })
+  // Read through a function on purpose, which keeps the values below on the main thread.
+  // Motion would otherwise hand them to a native view timeline, and Chrome insets that by
+  // html's scroll-padding-top (84px): at rest the name stood at 83 % opacity, the hint at 7 %.
+  const scrollYProgress = useTransform(() => viewProgress.get())
 
   // The fish clips are the heaviest part of the first screen: start them right away,
   // alongside the dive frames, so the first fish is ready when the dive ends.
@@ -85,7 +151,8 @@ export default function Hero({ onStart }) {
     else startPreload()
   }, [reduce])
 
-  // Start as soon as the dive frames are decoded (or after MAX_WAIT_MS at worst).
+  // Start as soon as the dive frames are decoded and the fonts are in. Fonts get at
+  // most FONT_GRACE_MS on top of the frames, and nothing waits past MAX_WAIT_MS.
   useEffect(() => {
     let alive = true
     const go = () => alive && setPlay(true)
@@ -93,7 +160,10 @@ export default function Hero({ onStart }) {
       go()
       return
     }
-    Promise.all(INTRO_IMAGES.map(decode)).then(go)
+    const fonts = fontsReady()
+    Promise.all(INTRO_IMAGES.map(decode))
+      .then(() => Promise.race([fonts, new Promise((resolve) => setTimeout(resolve, FONT_GRACE_MS))]))
+      .then(go)
     const t = setTimeout(go, MAX_WAIT_MS)
     return () => {
       alive = false
@@ -105,41 +175,58 @@ export default function Hero({ onStart }) {
     if (play) onStart?.()
   }, [play, onStart])
 
+  // The camera layers (see DIVE). `travel` mirrors their progress for the marine snow.
+  const cameraRef = useRef(null)
+  const dofRef = useRef(null)
+  const deepRef = useRef(null)
+  const coralRefs = useRef({})
   const travel = useMotionValue(reduce ? 1 : 0)
   useEffect(() => {
     if (!play) return
-    // QA hook: ?dive=0.4 freezes the camera at that point of the dive.
-    const frozen = parseFloat(new URLSearchParams(window.location.search).get('dive'))
-    if (!Number.isNaN(frozen)) {
-      travel.set(frozen)
-      return
-    }
     if (reduce) {
       travel.set(1)
       setDiveDone(true)
       return
     }
+    const timing = { duration: DIVE.duration * 1000, easing: 'linear', fill: 'both' }
+    const layers = [
+      [cameraRef.current, diveFrames((t) => ({ transform: `scale(${plateScale(t).toFixed(4)})` }))],
+      [dofRef.current, diveFrames((t) => ({ opacity: 1 - t }))],
+      [deepRef.current, diveFrames((t) => ({ opacity: clamp01(1 - t / 0.7) }))],
+      ...CORALS.map((c) => [coralRefs.current[c.key], coralFrames(c.depth)]),
+    ]
+    const anims = layers.filter(([el]) => el).map(([el, frames]) => el.animate(frames, timing))
+    // QA hook: ?dive=0.4 freezes the camera at that point of the dive.
+    const frozen = parseFloat(new URLSearchParams(window.location.search).get('dive'))
+    if (!Number.isNaN(frozen)) {
+      travel.set(frozen)
+      anims.forEach((a) => {
+        a.pause()
+        a.currentTime = diveTimeAt(frozen) * timing.duration
+      })
+      return () => anims.forEach((a) => a.cancel())
+    }
     const a = animate(travel, 1, { duration: DIVE.duration, ease: DIVE.ease, onComplete: () => setDiveDone(true) })
-    return () => a.stop()
+    return () => {
+      a.stop()
+      anims.forEach((x) => x.cancel())
+    }
   }, [play, reduce, travel])
-
-  const plateScale = useTransform(travel, project(PLATE_DEPTH))
-  const dof = useTransform(travel, (t) => `${(8 + 32 * t).toFixed(1)}%`)
-  const deep = useTransform(travel, [0, 0.7], [1, 0])
 
   const bgY = useTransform(scrollYProgress, [0, 1], ['0%', '18%'])
   const bgScale = useTransform(scrollYProgress, [0, 1], [1.04, 1.14])
   const titleY = useTransform(scrollYProgress, [0, 1], [0, -120])
   const fade = useTransform(scrollYProgress, [0, 0.55], [1, 0])
+  const hintFade = useTransform(scrollYProgress, [0, 0.1], [1, 0])
 
   // Plaque: intro entrance × scroll fade on the plaque itself. An ancestor with
   // opacity < 1 would switch off its backdrop blur (it becomes a backdrop root).
   const plaqueIn = useMotionValue(reduce ? 1 : 0)
   const plaqueOpacity = useTransform(() => fade.get() * plaqueIn.get())
-  const plaqueY = useTransform(plaqueIn, [0, 1], [30, 0])
+  const plaqueY = useTransform(plaqueIn, [0, 1], [18, 0])
   useEffect(() => {
     if (!play || reduce) return
-    const a = animate(plaqueIn, 1, { delay: T.plaque, duration: 0.8, ease: [0.22, 1, 0.36, 1] })
+    const a = animate(plaqueIn, 1, { delay: T.plaque, duration: 1.2, ease: SOFT })
     return () => a.stop()
   }, [play, reduce, plaqueIn])
 
@@ -154,16 +241,18 @@ export default function Hero({ onStart }) {
     my.set(e.clientY - r.top)
   }
 
-  // ── Logo: appears from transparency through a fine ripple (SVG displacement).
+  // ── Logo: appears from transparency through a fine ripple (SVG displacement;
+  // a plain fade on touch screens, see rippleLogo).
   const reveal = useMotionValue(reduce ? 1 : 0)
   const turbRef = useRef(null)
   const dispRef = useRef(null)
   const logoOpacity = useTransform(reveal, [0, 0.55, 1], [0, 0.85, 1])
   const logoScale = useTransform(reveal, [0, 1], [1.07, 1])
   const logoFilter = useTransform(reveal, (p) =>
-    p >= 0.999 ? 'none' : `url(#mir-aquariumov-ripple) blur(${((1 - p) * 5).toFixed(2)}px)`,
+    !rippleLogo || p >= 0.999 ? 'none' : `url(#mir-aquariumov-ripple) blur(${((1 - p) * 5).toFixed(2)}px)`,
   )
   useMotionValueEvent(reveal, 'change', (p) => {
+    if (!rippleLogo) return
     const k = 1 - p
     dispRef.current?.setAttribute('scale', (46 * k ** 1.3).toFixed(2))
     turbRef.current?.setAttribute('baseFrequency', `${(0.01 + 0.016 * k).toFixed(4)} ${(0.06 + 0.1 * k).toFixed(4)}`)
@@ -183,13 +272,15 @@ export default function Hero({ onStart }) {
       data-intro={!play ? 'waiting' : diveDone ? 'done' : 'diving'}
     >
       {/* Far plate: the reef the camera glides towards. */}
-      <motion.div className="hero-camera" style={{ scale: plateScale, '--dof': dof }}>
+      <div ref={cameraRef} className="hero-camera" style={{ transform: `scale(${plateScale(reduce ? 1 : 0)})` }}>
         <motion.div className="hero-media" style={{ y: bgY, scale: bgScale }}>
           <img src={asset('img/hero-water.jpg')} alt="" fetchPriority="high" />
-          {/* Depth of field: the same plate, blurred, visible only towards the edges (corals). */}
+          {/* Depth of field: the same plate, blurred, visible only towards the edges (corals)… */}
           <img src={asset('img/hero-water.jpg')} alt="" className="hero-dof" aria-hidden />
+          {/* …and almost up to the centre at the start of the dive, fading as the camera moves in. */}
+          {!reduce && <img ref={dofRef} src={asset('img/hero-water.jpg')} alt="" className="hero-dof is-start" aria-hidden />}
         </motion.div>
-      </motion.div>
+      </div>
       <motion.div className="hero-torch" style={{ background: torch }} aria-hidden />
 
       {!reduce && (
@@ -225,9 +316,9 @@ export default function Hero({ onStart }) {
       <motion.div className="hero-center" style={{ y: titleY, opacity: fade }}>
         <motion.p
           className="hero-kicker"
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={play ? { opacity: 1, y: 0 } : undefined}
-          transition={{ delay: reduce ? 0 : T.kicker, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ delay: reduce ? 0 : T.kicker, duration: 1.1, ease: SOFT }}
         >
           Выставка — магазин
         </motion.p>
@@ -244,8 +335,13 @@ export default function Hero({ onStart }) {
       {/* Foreground: corals the camera passes between, marine snow, deep-water haze. */}
       {!reduce && (
         <div className="dive" aria-hidden>
-          <motion.div className="dive-deep" style={{ opacity: deep }} />
-          {!diveDone && CORALS.map((c) => <DiveCoral key={c.key} coral={c} travel={travel} />)}
+          <div ref={deepRef} className="dive-deep" />
+          {!diveDone &&
+            CORALS.map((c) => (
+              <div key={c.key} ref={(el) => (coralRefs.current[c.key] = el)} className={'dive-coral ' + c.cls}>
+                <img src={c.src} alt="" decoding="async" />
+              </div>
+            ))}
           <DiveSnow travel={travel} active={inView && pageVisible} />
         </div>
       )}
@@ -258,7 +354,7 @@ export default function Hero({ onStart }) {
           animate={play ? 'shown' : 'hidden'}
           variants={{
             hidden: {},
-            shown: { transition: { delayChildren: reduce ? 0 : T.plaque + 0.25, staggerChildren: reduce ? 0 : 0.12 } },
+            shown: { transition: { delayChildren: reduce ? 0 : T.plaque + 0.2, staggerChildren: reduce ? 0 : 0.14 } },
           }}
         >
           <motion.p className="hero-lead" variants={item}>
@@ -287,6 +383,21 @@ export default function Hero({ onStart }) {
         </motion.div>
       </div>
 
+      {/* Scroll hint: comes up once the intro has settled, goes as soon as the page moves. */}
+      <motion.div className="hero-hint" style={{ opacity: hintFade }} aria-hidden data-testid="scroll-hint">
+        <motion.span
+          className="hero-hint-inner"
+          initial={{ opacity: 0, y: -6 }}
+          animate={play ? { opacity: 1, y: 0 } : undefined}
+          transition={{ delay: reduce ? 0 : T.hint, duration: 1, ease: SOFT }}
+        >
+          Листайте вниз
+          <svg className="hero-hint-arrow" viewBox="0 0 12 18" width="10" height="15">
+            <path d="M6 1.5v14M1.5 11 6 15.5 10.5 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </motion.span>
+      </motion.div>
+
       <svg className="hero-wave" viewBox="0 0 1440 90" preserveAspectRatio="none" aria-hidden>
         <motion.path
           fill="var(--paper)"
@@ -301,18 +412,6 @@ export default function Hero({ onStart }) {
         />
       </svg>
     </section>
-  )
-}
-
-/** One coral layer: full-frame box scaled about the vanishing point by its depth. */
-function DiveCoral({ coral, travel }) {
-  const scale = useTransform(travel, project(coral.depth))
-  const end = project(coral.depth)(1)
-  const opacity = useTransform(scale, [1 + (end - 1) * 0.55, 1 + (end - 1) * 0.92], [1, 0])
-  return (
-    <motion.div className={'dive-coral ' + coral.cls} style={{ scale, opacity }}>
-      <img src={coral.src} alt="" decoding="async" />
-    </motion.div>
   )
 }
 
@@ -495,6 +594,7 @@ function FishSwim({ heroRef, titleRef, start, reduce }) {
   const firstReady = !!clips[firstClip]
   const [pass, setPass] = useState(null)
   const [visible, setVisible] = useState(false)
+  const waitingFrame = useRef(false) // a pass is set, its first frame not drawn yet
   const index = useRef(0)
   const history = useRef([])
   const timer = useRef(0)
@@ -532,9 +632,16 @@ function FishSwim({ heroRef, titleRef, start, reduce }) {
     if (spec.clip < 0) return
     history.current.push(spec)
     index.current += 1
+    // The layer fades in with the clip's first good frame, not when the clip is asked to start.
+    waitingFrame.current = true
     setPass({ ...spec, box: layout(spec, g.hero, g.title, spec.jitter), token: index.current })
-    setVisible(true)
   }, [geometry, qa])
+
+  const onFrame = useCallback(() => {
+    if (!waitingFrame.current) return
+    waitingFrame.current = false
+    setVisible(true)
+  }, [])
 
   useEffect(() => {
     if (start && !startedAt.current) startedAt.current = performance.now()
@@ -582,7 +689,7 @@ function FishSwim({ heroRef, titleRef, start, reduce }) {
       }}
       initial={{ opacity: 0 }}
       animate={{ opacity: visible ? 1 : 0 }}
-      transition={{ duration: visible ? 0.35 : 0.25 }}
+      transition={{ duration: visible ? 0.5 : 0.25 }}
       data-testid="hero-fish"
       data-mode={pass.mode}
       data-clip={pass.clip}
@@ -595,6 +702,7 @@ function FishSwim({ heroRef, titleRef, start, reduce }) {
         paused={!inView || !pageVisible}
         className="hero-fish-canvas"
         onEnded={onEnded}
+        onFrame={onFrame}
       />
     </motion.div>
   )

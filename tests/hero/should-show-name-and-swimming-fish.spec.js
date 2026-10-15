@@ -15,6 +15,15 @@ test.describe('Главный экран', () => {
     await expect(page.locator('.hero-facts')).toContainText('+7 (8352) 57-19-55')
     await expect(page.locator('.hero-facts')).not.toContainText('Часы')
 
+    // 1a. Внизу появляется подсказка «Листайте вниз» и уходит, как только страницу прокрутили
+    const hint = page.getByTestId('scroll-hint')
+    await expect(hint).toHaveText('Листайте вниз')
+    await expect(hint.locator('.hero-hint-inner')).toHaveCSS('opacity', '1', { timeout: 6_000 })
+    await page.mouse.wheel(0, 300)
+    await expect(hint).toHaveCSS('opacity', '0')
+    await page.mouse.wheel(0, -300)
+    await expect(hint).toHaveCSS('opacity', '1')
+
     // 2. После интро выплывает рыба
     const fish = page.getByTestId('hero-fish')
     await expect(fish).toHaveCSS('opacity', '1', { timeout: 10_000 })

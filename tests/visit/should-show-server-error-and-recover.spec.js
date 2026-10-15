@@ -25,6 +25,7 @@ test.describe('Визит', () => {
     await form.getByRole('button', { name: 'Записаться' }).click()
     const success = page.getByTestId('booking-success')
     await expect(success).toContainText('Ждём вас, Мария!')
+    await expect(success).toContainText('посещение выставки')
     await expect(success).toContainText(/MA-\d{4}/)
   })
 })

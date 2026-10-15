@@ -48,6 +48,7 @@ public/          картинки и видео для сайта
 src/
   components/    секции страницы
   builder/       3D-конструктор (сцена, модели, каталог)
+  fonts/         шрифты (Golos Text, JetBrains Mono, Literata), подключены в fonts.css
 tests/           Playwright-тесты
 specs/           план тестирования
 sources/coral/   скрипты нарезки кораллов из исходного кадра (Python: numpy, Pillow, scipy)

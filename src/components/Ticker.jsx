@@ -1,45 +1,27 @@
-import { useRef } from 'react'
-import {
-  motion,
-  useAnimationFrame,
-  useMotionValue,
-  useScroll,
-  useSpring,
-  useTransform,
-  useVelocity,
-  usePageInView,
-  useReducedMotion,
-} from 'motion/react'
-
-const wrap = (min, max, v) => {
-  const range = max - min
-  return ((((v - min) % range) + range) % range) + min
-}
+import { useLayoutEffect, useRef } from 'react'
 
 const words = ['Пресноводные рыбы', 'Морские кораллы', 'Креветки', 'Живые растения', 'Аквариумы и оборудование', 'Корм и декор', 'Продавцы — аквариумисты']
 
-/** Marquee whose speed and direction follow the scroll velocity. */
-export default function Ticker({ baseVelocity = -2.2 / 1.5 }) {
-  const baseX = useMotionValue(0)
-  const { scrollY } = useScroll()
-  const scrollVelocity = useVelocity(scrollY)
-  const smoothVelocity = useSpring(scrollVelocity, { damping: 50, stiffness: 400 })
-  const velocityFactor = useTransform(smoothVelocity, [0, 1000], [0, 5], { clamp: false })
-  const skew = useTransform(smoothVelocity, [-2500, 0, 2500], [8, 0, -8])
-  const x = useTransform(baseX, (v) => `${wrap(-25, -50, v)}%`)
-  const direction = useRef(1)
-  const pageVisible = usePageInView()
-  const reduce = useReducedMotion()
+const COPIES = 4
+const SPEED = 36 // px per second
 
-  useAnimationFrame((_, delta) => {
-    if (!pageVisible || reduce) return
-    let moveBy = direction.current * baseVelocity * (delta / 1000)
-    const f = velocityFactor.get()
-    if (f < 0) direction.current = -1
-    else if (f > 0) direction.current = 1
-    moveBy += direction.current * moveBy * f
-    baseX.set(baseX.get() + moveBy)
-  })
+/**
+ * Marquee drifting slowly to the left on its own, whatever the page does. It is a
+ * CSS animation (runs on the compositor) that moves the track by exactly one copy
+ * of the row per cycle, so the loop is seamless; the cycle length is set from the
+ * row's measured width to keep the speed the same on every screen.
+ */
+export default function Ticker() {
+  const track = useRef(null)
+
+  useLayoutEffect(() => {
+    const el = track.current
+    const measure = () => el.style.setProperty('--ticker-duration', `${(el.scrollWidth / COPIES / SPEED).toFixed(2)}s`)
+    measure()
+    const ro = new ResizeObserver(measure) // web fonts arriving change the row width
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const row = words.map((w) => (
     <span key={w} className="ticker-item">
@@ -53,12 +35,13 @@ export default function Ticker({ baseVelocity = -2.2 / 1.5 }) {
   return (
     <div className="ticker">
       <p className="sr-only">{words.join(' · ')}</p>
-      <motion.div className="ticker-track" style={{ x, skewX: skew }} aria-hidden>
-        {row}
-        {row}
-        {row}
-        {row}
-      </motion.div>
+      <div ref={track} className="ticker-track" aria-hidden data-testid="ticker-track">
+        {Array.from({ length: COPIES }, (_, i) => (
+          <span key={i} className="ticker-row">
+            {row}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
