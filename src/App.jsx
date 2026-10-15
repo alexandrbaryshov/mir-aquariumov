@@ -7,7 +7,6 @@ import Ticker from './components/Ticker.jsx'
 import Halls from './components/Halls.jsx'
 import Shop from './components/Shop.jsx'
 import Builder from './components/Builder.jsx'
-import Steps from './components/Steps.jsx'
 import Places from './components/Places.jsx'
 import Visit from './components/Visit.jsx'
 import Footer from './components/Footer.jsx'
@@ -72,7 +71,6 @@ export default function App() {
         <Halls />
         <Shop onAdd={addToCart} cartButtonRef={cartButtonRef} />
         <Builder onAdd={addToCart} cartButtonRef={cartButtonRef} />
-        <Steps />
         <Places />
         <Visit lines={lines} onBooked={() => setCart([])} />
       </main>

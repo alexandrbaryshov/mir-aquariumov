@@ -67,8 +67,59 @@ const SPECIES = {
     dorsal: { len: 0.6, h: 0.16, color: '#ffd23f' },
     anal: { len: 0.45, h: 0.14, color: '#ffd23f' },
   },
+  platy: {
+    len: 0.36, h: 0.14, w: 0.08, speed: 0.7, band: [0.3, 0.85],
+    body: (x, y, c) => lerpHex(c, '#ff5a1f', '#ffb347', (y + 1) / 2 - x * 0.2),
+    tail: { kind: 'fan', len: 0.14, spread: 1.0, paint: (r, c) => lerpHex(c, '#ff5a1f', '#1d1d1d', (r - 0.7) * 3) },
+    dorsal: { len: 0.1, h: 0.06, color: '#ff7a2a' },
+  },
+  barb: {
+    len: 0.38, h: 0.2, w: 0.07, speed: 0.9, band: [0.35, 0.8], school: 0.7,
+    body: (x, y, c) => ([0.52, 0.12, -0.26, -0.6].some((b) => Math.abs(x - b) < 0.07) ? set(c, '#1c1c1c') : lerpHex(c, '#f6c94a', '#f2e6b0', (y + 1) / 2)),
+    tail: { kind: 'fork', len: 0.13, h: 0.11, color: '#e8462e' },
+    dorsal: { len: 0.12, h: 0.09, color: '#d23a26' },
+  },
+  cory: {
+    len: 0.38, h: 0.14, w: 0.1, speed: 0.5, band: [0, 0.06],
+    body: (x, y, c) => (Math.sin(x * 40) * Math.sin(y * 30) > 0.55 ? set(c, '#3b3328') : lerpHex(c, '#d9ccb2', '#a8987a', (y + 1) / 2)),
+    tail: { kind: 'fork', len: 0.12, h: 0.1, color: '#cfc2a6' },
+    dorsal: { len: 0.1, h: 0.12, color: '#bfb194' },
+  },
+  discus: {
+    len: 0.62, h: 0.58, w: 0.09, speed: 0.35, band: [0.35, 0.85],
+    body: (x, y, c) => (Math.sin(y * 13 + Math.sin(x * 9) * 1.4) > 0.35 ? set(c, '#ff8a2a') : lerpHex(c, '#1f6fd0', '#4fb2f0', (y + 1) / 2)),
+    tail: { kind: 'fan', len: 0.14, spread: 1.1, paint: (r, c) => lerpHex(c, '#2a78d4', '#9fd2f7', r) },
+    dorsal: { len: 0.5, h: 0.12, sweep: 0.2, color: '#2a78d4' },
+    anal: { len: 0.45, h: 0.11, sweep: 0.2, color: '#2a78d4' },
+  },
+  gramma: {
+    len: 0.44, h: 0.17, w: 0.08, speed: 0.6, band: [0.12, 0.55],
+    body: (x, y, c) => (x > -0.05 ? set(c, '#8b3fc4') : set(c, '#ffd23f')),
+    tail: { kind: 'fork', len: 0.13, h: 0.12, color: '#ffd23f' },
+    dorsal: { len: 0.24, h: 0.08, color: '#7a36b0' },
+  },
+  mandarin: {
+    len: 0.4, h: 0.16, w: 0.11, speed: 0.3, band: [0.01, 0.18],
+    body: (x, y, c) => (Math.abs(Math.sin(x * 16 + Math.sin(y * 10) * 1.6)) < 0.3 ? set(c, '#2e9fd0') : lerpHex(c, '#ff7a1f', '#e3561a', (y + 1) / 2)),
+    tail: { kind: 'fan', len: 0.15, spread: 1.2, paint: (r, c) => lerpHex(c, '#ff7a1f', '#2e9fd0', r) },
+    dorsal: { len: 0.14, h: 0.16, color: '#ff7a1f' },
+  },
+  bluetang: {
+    len: 1.0, h: 0.66, w: 0.14, speed: 0.6, band: [0.3, 0.8],
+    body: (x, y, c) => {
+      // The black "palette" sweeping from the eye to the tail, with a blue patch inside.
+      const p = y - (0.25 - (x - 0.3) * 0.35)
+      if (Math.abs(p) < 0.16 && x < 0.55 && x > -0.75) return Math.abs(p) < 0.06 && x < 0.05 && x > -0.45 ? set(c, '#2a6ae0') : set(c, '#14161c')
+      return lerpHex(c, '#1f4fd0', '#3b7cf0', (y + 1) / 2)
+    },
+    tail: { kind: 'fork', len: 0.24, h: 0.28, color: '#ffd23f' },
+    dorsal: { len: 0.6, h: 0.14, color: '#14161c' },
+    anal: { len: 0.45, h: 0.12, color: '#1f4fd0' },
+  },
   shrimp: { crawl: true, len: 0.24, color: '#2f6fd6', speed: 0.18 },
   cleaner: { crawl: true, len: 0.4, color: '#e2403a', stripe: true, speed: 0.15 },
+  snail: { crawl: true, shape: 'snail', len: 0.32, color: '#e3b23c', speed: 0.06 },
+  star: { crawl: true, shape: 'star', len: 0.5, color: '#e8632e', speed: 0.05 },
 }
 
 function finGeo({ len, h, sweep = 0.25 }, up = 1) {
@@ -95,6 +146,8 @@ function tailGeo(t) {
 
 function buildFish(id) {
   const sp = SPECIES[id]
+  if (sp.shape === 'snail') return buildSnail(sp)
+  if (sp.shape === 'star') return buildStar(sp)
   if (sp.crawl) return buildShrimp(sp)
   const { len, h, w } = sp
   const body = new THREE.SphereGeometry(1, 24, 16)
@@ -168,6 +221,46 @@ function buildShrimp(sp) {
   fan.translate(-L * 0.42, L * 0.08, 0)
   parts.push(part(fan, sp.color))
   return { body: merge(parts), fins: null, tail: null, tailX: 0, size: L }
+}
+
+/** Apple snail: a banded spiral shell on a pale foot, with feelers. Heads along +x. */
+function buildSnail(sp) {
+  const L = sp.len
+  const foot = new THREE.SphereGeometry(L * 0.5, 16, 8)
+  foot.scale(1.25, 0.28, 0.55)
+  foot.translate(0.04 * L, L * 0.07, 0)
+  const parts = [part(foot, '#e7d3a6')]
+  for (let i = 0; i < 5; i++) {
+    const r = L * 0.4 * 0.72 ** i
+    const a = i * 1.5
+    const s = new THREE.SphereGeometry(r, 16, 12)
+    s.translate(-L * 0.08 + Math.cos(a) * L * 0.1 * (1 - i / 5), L * 0.34 + i * L * 0.075, Math.sin(a) * L * 0.1 * (1 - i / 5))
+    parts.push(paint(s.toNonIndexed(), (x, y, z, c) => (Math.sin(y * 70 + Math.atan2(z, x) * 2) > 0.55 ? set(c, '#6b4a1f') : set(c, sp.color))))
+  }
+  for (const s of [1, -1]) {
+    const f = new THREE.CylinderGeometry(0.005, 0.008, L * 0.4, 5)
+    f.rotateZ(-Math.PI / 2 + 0.4)
+    f.rotateY(s * 0.4)
+    f.translate(L * 0.6, L * 0.14, s * L * 0.08)
+    parts.push(part(f, '#d8c18e'))
+  }
+  return { body: merge(parts), fins: null, tail: null, tailX: 0, size: L }
+}
+
+/** Starfish: five tapered arms, lying flat, with paler bumps. */
+function buildStar(sp) {
+  const L = sp.len
+  const s = new THREE.Shape()
+  for (let i = 0; i <= 10; i++) {
+    const a = (i / 10) * Math.PI * 2 + Math.PI / 2
+    const r = i % 2 ? L * 0.16 : L * 0.5
+    i ? s.lineTo(Math.cos(a) * r, Math.sin(a) * r) : s.moveTo(Math.cos(a) * r, Math.sin(a) * r)
+  }
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.035, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.03, bevelSegments: 2 })
+  g.rotateX(-Math.PI / 2)
+  g.translate(0, 0.02, 0)
+  const body = paint(g.index ? g.toNonIndexed() : g, (x, y, z, c) => (Math.sin(x * 60) * Math.sin(z * 60) > 0.6 ? set(c, '#ffd0a8') : lerpHex(c, sp.color, '#b8381a', Math.hypot(x, z) / (L * 0.5))))
+  return { body, fins: null, tail: null, tailX: 0, size: L }
 }
 
 const fishMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.08 })

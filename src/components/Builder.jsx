@@ -11,10 +11,23 @@ let seq = 0
 const uid = () => `${Date.now().toString(36)}-${(seq++).toString(36)}`
 
 // Where on the floor each kind of item likes to stand (v: −1 back glass … 1 front glass).
-const ZONES = { vallis: [-1, -0.55], sword: [-0.75, -0.15], anubias: [-0.35, 0.45], moss: [0.05, 0.8] }
+const ZONES = {
+  vallis: [-1, -0.55],
+  cabomba: [-1, -0.55],
+  ludwigia: [-0.9, -0.35],
+  gorgonian: [-1, -0.6],
+  pillar: [-0.85, -0.35],
+  sword: [-0.75, -0.15],
+  slate: [-0.6, 0.2],
+  crypt: [-0.3, 0.45],
+  anubias: [-0.35, 0.45],
+  hairgrass: [0.25, 0.85],
+  shell: [0.2, 0.85],
+  moss: [0.05, 0.8],
+}
 const DEFAULT_ZONE = [-0.65, 0.4]
-// Spots taken by equipment (filter, heater, air stone) in the same normalised units.
-const RESERVED = [[0.93, -0.86], [-0.93, -0.9], [-0.4, -0.8]]
+// Spots taken by equipment (filter, heater, air stone or skimmer, CO₂ diffuser) in the same normalised units.
+const RESERVED = [[0.93, -0.86], [-0.93, -0.9], [-0.4, -0.8], [-0.88, 0.72]]
 
 function findSpot(id, placed, tank) {
   const [vMin, vMax] = ZONES[id] ?? DEFAULT_ZONE
@@ -511,8 +524,8 @@ function TankTab({ water, tankId, onWater, onTank, cap }) {
 }
 
 function TankGlyph({ size: [w, h] }) {
-  const W = 10 + w * 3.2
-  const H = 6 + h * 3.2
+  const W = 8 + w * 3.2
+  const H = 4 + h * 3.3
   return (
     <svg viewBox="0 0 48 30" width="48" height="30" aria-hidden className="b-tank-glyph">
       <rect x={(48 - W) / 2} y={30 - H} width={W} height={H} rx="2" fill="color-mix(in srgb, var(--aqua) 22%, transparent)" stroke="currentColor" strokeWidth="1.5" />

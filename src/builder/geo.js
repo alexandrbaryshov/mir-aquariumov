@@ -165,6 +165,111 @@ export function archGeo(seed) {
   return paint(g, reefPaint)
 }
 
+/** Stacked slate slabs stepping up and back: terraces. */
+export function slateGeo(seed) {
+  const r = rng(seed)
+  const parts = []
+  let y = 0
+  for (let i = 0; i < 4; i++) {
+    const h = 0.12 + r() * 0.06
+    const g = lumpy(new THREE.BoxGeometry(1.3 - i * 0.22 + r() * 0.2, h, 0.8 - i * 0.1 + r() * 0.15, 4, 1, 3), 0.03, 4, r() * 10)
+    g.rotateY((r() - 0.5) * 0.6)
+    g.rotateZ((r() - 0.5) * 0.12)
+    g.translate((r() - 0.5) * 0.3 + i * 0.08, y + h / 2, (r() - 0.5) * 0.2 - i * 0.06)
+    y += h * 0.92
+    parts.push(g)
+  }
+  return paint(merge(parts), (x, y, z, c) => mix(c, '#3d434a', '#858d94', 0.35 + y * 0.5 + noise(x * 5, y * 30, z * 5) * 0.3))
+}
+
+/** Spider wood: branches fanning up and out from a low knot, a few roots into the ground. */
+export function rootGeo(seed) {
+  const r = rng(seed)
+  const V = (x, y, z) => new THREE.Vector3(x, y, z)
+  const parts = []
+  const n = 6
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + r() * 0.5
+    const reach = 0.7 + r() * 0.5
+    const up = 0.8 + r() * 0.8
+    const cx = Math.cos(a)
+    const sz = Math.sin(a)
+    parts.push(
+      taperedTube([V(0, 0.35, 0), V(cx * reach * 0.35, 0.55 + up * 0.3, sz * reach * 0.25), V(cx * reach * 0.75, 0.5 + up * 0.7, sz * reach * 0.55), V(cx * reach, 0.4 + up, sz * reach * 0.7)], 0.07, 0.15, 24, 6),
+    )
+  }
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + r()
+    parts.push(taperedTube([V(0, 0.42, 0), V(Math.cos(a) * 0.3, 0.2, Math.sin(a) * 0.25), V(Math.cos(a) * 0.55, 0, Math.sin(a) * 0.45)], 0.08, 0.4, 12, 6))
+  }
+  return paint(merge(parts), (x, y, z, c) => mix(c, '#5a4030', '#b58e66', y / 1.6 + noise(x * 9, y * 12, z * 9) * 0.2))
+}
+
+/** Two boulders with a slab across: a cave fish can swim through. */
+export function caveGeo(seed) {
+  const r = rng(seed)
+  const parts = []
+  for (const s of [-1, 1]) {
+    const g = lumpy(new THREE.IcosahedronGeometry(0.4, 1), 0.09, 2.4, r() * 10)
+    g.scale(0.8, 1.1, 0.9)
+    g.translate(s * 0.48, 0.4, 0)
+    parts.push(g)
+  }
+  const top = lumpy(new THREE.BoxGeometry(1.6, 0.22, 0.85, 4, 1, 3), 0.05, 3, r() * 10)
+  top.rotateZ((r() - 0.5) * 0.15)
+  top.translate(0, 0.9, 0)
+  parts.push(top)
+  return paint(merge(parts), (x, y, z, c) => mix(c, '#6f665c', '#c4baa9', y / 1.1 + noise(x * 6, y * 9, z * 6) * 0.25))
+}
+
+/** A conch lying on its side and a scallop. */
+export function shellGeo(seed) {
+  const r = rng(seed)
+  const pts = [[0, 0], [0.12, 0.05], [0.24, 0.16], [0.3, 0.3], [0.26, 0.45], [0.17, 0.6], [0.09, 0.75], [0.02, 0.9]].map(([x, y]) => new THREE.Vector2(x, y))
+  const conch = new THREE.LatheGeometry(pts, 22)
+  const pos = conch.attributes.position
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i)
+    const z = pos.getZ(i)
+    const k = 1 + 0.08 * Math.sin(Math.atan2(z, x) * 3 + pos.getY(i) * 22) // spiral knobs
+    pos.setXYZ(i, x * k, pos.getY(i), z * k)
+  }
+  conch.computeVertexNormals()
+  paint(conch, (x, y, z, c) => mix(c, '#f0d8bd', '#c27d58', 0.5 + 0.5 * Math.sin(y * 30 + Math.atan2(z, x) * 2)))
+  conch.rotateZ(Math.PI / 2 - 0.25)
+  conch.translate(0.5, 0.22, 0.05)
+
+  const fan = new THREE.CircleGeometry(0.28, 28, Math.PI * 0.12, Math.PI * 0.76)
+  const fp = fan.attributes.position
+  for (let i = 0; i < fp.count; i++) {
+    const x = fp.getX(i)
+    const y = fp.getY(i)
+    fp.setZ(i, Math.abs(Math.sin(Math.atan2(y, x) * 14)) * 0.025 * Math.hypot(x, y) * 4 + (x * x + y * y) * 0.5)
+  }
+  fan.computeVertexNormals()
+  paint(fan, (x, y, z, c) => mix(c, '#e3a07a', '#fbe9d8', Math.hypot(x, y) / 0.28))
+  fan.rotateX(-Math.PI / 2 + 0.35)
+  fan.translate(-0.35, 0.06, 0.12)
+  const g = merge([conch, fan])
+  g.rotateY(r() * Math.PI * 2)
+  return g
+}
+
+/** A column of live rock, narrowing upwards. */
+export function pillarGeo(seed) {
+  const r = rng(seed)
+  const parts = []
+  let y = 0
+  for (const s of [0.62, 0.5, 0.42, 0.3]) {
+    const g = lumpy(new THREE.IcosahedronGeometry(s, 3), s * 0.3, 2.8, r() * 10, true)
+    g.scale(1.15, 0.85, 1)
+    g.translate((r() - 0.5) * 0.35, y + s * 0.75, (r() - 0.5) * 0.25)
+    y += s * 1.2
+    parts.push(g)
+  }
+  return paint(merge(parts), reefPaint)
+}
+
 /* ───────── Plants ───────── */
 
 export function vallisGeo(seed) {
@@ -248,6 +353,92 @@ export function anubiasGeo(seed) {
     parts.push(part(l, i % 2 ? '#24572f' : '#2f6f3c'))
   }
   return merge(parts)
+}
+
+/** Stems with whorls of needle-thin leaves. */
+export function cabombaGeo(seed) {
+  const r = rng(seed)
+  const parts = []
+  for (let s = 0; s < 7; s++) {
+    const L = 2 + r() * 1.1
+    const x0 = (r() - 0.5) * 0.45
+    const z0 = (r() - 0.5) * 0.3
+    const stem = new THREE.CylinderGeometry(0.012, 0.016, L, 4)
+    stem.translate(x0, L / 2, z0)
+    parts.push(stem)
+    for (let y = 0.25; y < L; y += 0.16) {
+      const k = 1 - (y / L) * 0.4
+      for (let j = 0; j < 6; j++) {
+        const g = new THREE.PlaneGeometry(0.2 * k, 0.026)
+        g.translate(0.1 * k, 0, 0)
+        g.rotateZ(0.35)
+        g.rotateY((j / 6) * Math.PI * 2 + y * 3)
+        g.translate(x0, y, z0)
+        parts.push(g)
+      }
+    }
+  }
+  return paint(merge(parts), (x, y, z, c) => mix(c, '#3a7a2e', '#9be06a', y / 3))
+}
+
+/** Stems with pairs of oval leaves, green below and red towards the light. */
+export function ludwigiaGeo(seed) {
+  const r = rng(seed)
+  const parts = []
+  for (let s = 0; s < 6; s++) {
+    const L = 1.4 + r() * 0.8
+    const x0 = (r() - 0.5) * 0.35
+    const z0 = (r() - 0.5) * 0.25
+    const stem = new THREE.CylinderGeometry(0.014, 0.018, L, 5)
+    stem.translate(x0, L / 2, z0)
+    parts.push(stem)
+    for (let y = 0.2, i = 0; y < L; y += 0.14, i++)
+      for (const side of [0, Math.PI]) {
+        const g = leaf(0.2, 0.08, 0.05)
+        g.rotateZ(-Math.PI / 2 + 0.5)
+        g.rotateY(side + i * (Math.PI / 2))
+        g.translate(x0, y, z0)
+        parts.push(g)
+      }
+  }
+  return paint(merge(parts), (x, y, z, c) => mix(c, '#4c8a3a', '#d2453a', (y - 0.4) / 1.4))
+}
+
+/** Rosette of long wavy bronze-green leaves. */
+export function cryptGeo(seed) {
+  const r = rng(seed)
+  const parts = []
+  const n = 9
+  for (let i = 0; i < n; i++) {
+    const len = 0.55 + r() * 0.35
+    const g = leaf(len, 0.11 + r() * 0.03, 0.25)
+    const pos = g.attributes.position
+    for (let k = 0; k < pos.count; k++) pos.setZ(k, pos.getZ(k) + Math.sin(pos.getY(k) * 18) * 0.02 * (pos.getY(k) / len))
+    g.computeVertexNormals()
+    g.translate(0, 0.05, 0)
+    g.rotateX(-(0.35 + r() * 0.5))
+    g.rotateY((i / n) * Math.PI * 2 + r() * 0.5)
+    parts.push(g)
+  }
+  return paint(merge(parts), (x, y, z, c) => mix(c, '#3f5e2a', '#a5743e', y / 0.8))
+}
+
+/** A tuft of hair-thin blades: a lawn when several stand together. */
+export function hairgrassGeo(seed) {
+  const r = rng(seed)
+  const parts = []
+  for (let i = 0; i < 70; i++) {
+    const L = 0.22 + r() * 0.28
+    const g = new THREE.PlaneGeometry(0.014, L, 1, 3)
+    g.translate(0, L / 2, 0)
+    g.rotateX((r() - 0.5) * 0.5)
+    g.rotateY(r() * Math.PI)
+    const rad = Math.sqrt(r()) * 0.45
+    const a = r() * Math.PI * 2
+    g.translate(Math.cos(a) * rad, 0, Math.sin(a) * rad * 0.8)
+    parts.push(g)
+  }
+  return paint(merge(parts), (x, y, z, c) => mix(c, '#3f8a35', '#a6e070', y / 0.45))
 }
 
 export function mossGeo(seed) {
@@ -369,6 +560,99 @@ export function zoaGeo(seed) {
   return merge(parts)
 }
 
+/** Dome with meandering grooves. */
+export function brainGeo(seed) {
+  const off = rng(seed)() * 10
+  const groove = (x, y, z) => Math.sin(x * 22 + Math.sin(z * 11 + off) * 2.2 + Math.sin(y * 9) * 1.5)
+  const g = new THREE.SphereGeometry(0.45, 48, 20, 0, Math.PI * 2, 0, Math.PI / 2)
+  const pos = g.attributes.position
+  const v = new THREE.Vector3()
+  const n = new THREE.Vector3()
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i)
+    n.copy(v).normalize()
+    v.addScaledVector(n, Math.abs(groove(v.x, v.y, v.z)) * 0.035)
+    pos.setXYZ(i, v.x, v.y * 0.72, v.z)
+  }
+  g.computeVertexNormals()
+  return paint(g, (x, y, z, c) => mix(c, '#4e6b3a', '#c7e39a', Math.abs(groove(x, y / 0.72, z))))
+}
+
+/** Mushroom corals: flat discs on a low rock, pale in the middle. */
+export function discoGeo(seed, color = '#4a7fd6') {
+  const r = rng(seed)
+  const rock = lumpy(new THREE.IcosahedronGeometry(0.35, 2), 0.06, 3, r() * 10, true)
+  rock.scale(1.3, 0.45, 1)
+  rock.translate(0, 0.12, 0)
+  const parts = [part(rock, '#8c7f6f')]
+  for (let i = 0; i < 8; i++) {
+    const a = i * 2.39996
+    const rr = 0.06 + Math.sqrt(i / 8) * 0.3
+    const rad = 0.11 + r() * 0.04
+    const disc = paint(new THREE.CylinderGeometry(rad, 0.05, 0.03, 18).toNonIndexed(), (x, y, z, c) => {
+      const d = Math.hypot(x, z) / rad
+      return d < 0.25 ? c.set('#cfe6ff') : mix(c, color, '#2b3f8f', d - 0.3 + (y < 0 ? 0.4 : 0))
+    })
+    disc.rotateX((r() - 0.5) * 0.6)
+    disc.rotateZ((r() - 0.5) * 0.6)
+    disc.translate(Math.cos(a) * rr, 0.22 + r() * 0.05, Math.sin(a) * rr * 0.8)
+    parts.push(disc)
+  }
+  return merge(parts)
+}
+
+/** Sea fan: a flat net of branches. */
+export function gorgonianGeo(seed, color = '#d8602f') {
+  const r = rng(seed)
+  const parts = []
+  const up = new THREE.Vector3(0, 1, 0)
+  const q = new THREE.Quaternion()
+  const grow = (start, dir, len, rad, depth) => {
+    const g = new THREE.CylinderGeometry(rad * 0.75, rad, len, 5)
+    g.translate(0, len / 2, 0)
+    q.setFromUnitVectors(up, dir)
+    g.applyQuaternion(q)
+    g.translate(start.x, start.y, start.z)
+    parts.push(part(g, color))
+    if (depth === 0) return
+    const end = start.clone().addScaledVector(dir, len)
+    for (const side of [-1, 1]) {
+      const d = dir.clone()
+      d.x += side * (0.35 + r() * 0.35)
+      d.z += (r() - 0.5) * 0.12
+      d.y += 0.15
+      d.normalize()
+      grow(end, d, len * (0.78 + r() * 0.12), rad * 0.75, depth - 1)
+    }
+  }
+  grow(new THREE.Vector3(0, 0, 0), up.clone(), 0.35, 0.05, 5)
+  return merge(parts)
+}
+
+/** Hammer coral: tentacles ending in anchor-shaped tips, on a stony base. */
+export function euphylliaGeo(seed, color = '#7dd6b8') {
+  const r = rng(seed)
+  const base = new THREE.CylinderGeometry(0.22, 0.3, 0.25, 12)
+  base.translate(0, 0.12, 0)
+  const parts = [part(base, '#cfc6b4')]
+  for (let i = 0; i < 26; i++) {
+    const a = i * 2.39996 + r() * 0.2
+    const rr = Math.sqrt(i / 26) * 0.24
+    const len = 0.22 + r() * 0.14
+    const t = new THREE.CylinderGeometry(0.018, 0.024, len, 6)
+    t.translate(0, len / 2, 0)
+    const tip = new THREE.CapsuleGeometry(0.03, 0.08, 3, 8)
+    tip.rotateZ(Math.PI / 2)
+    tip.translate(0, len, 0)
+    const m = merge([part(t, color), part(tip, '#e8fff6')])
+    m.rotateZ((r() - 0.5) * 0.6 + rr * 1.2)
+    m.rotateY(a)
+    m.translate(Math.cos(a) * rr, 0.22, -Math.sin(a) * rr)
+    parts.push(m)
+  }
+  return merge(parts)
+}
+
 /* ───────── Substrate ───────── */
 
 /** Top surface plus skirts down to y = 0, in unit X/Z; the mesh is scaled by tank width/depth. */
@@ -434,6 +718,10 @@ export function groundTexture(kind) {
     gravel: { base: '#4b4f51', dots: ['#2d3133', '#6b7174', '#8a8f8f', '#3b2f28', '#a5a9a6'], size: [2.2, 5], n: 900 },
     soil: { base: '#3d2b20', dots: ['#2a1d15', '#5a4232', '#6d5240', '#1d140f'], size: [1.6, 3.6], n: 1400 },
     aragonite: { base: '#e4d9c6', dots: ['#d4c6ae', '#f6f0e4', '#e8bcbc', '#cbbb9f'], size: [0.8, 2.4], n: 2600 },
+    pebble: { base: '#8a8073', dots: ['#b9ae9e', '#6d655b', '#a39684', '#d3c8b6', '#5a524a'], size: [4, 8], n: 520 },
+    blacksand: { base: '#222327', dots: ['#3a3b40', '#141518', '#4a4b52', '#2e2f34'], size: [0.6, 1.6], n: 3200 },
+    lava: { base: '#5e2c22', dots: ['#7a3b2c', '#3f1c16', '#8f4a36', '#2b1410', '#6a3326'], size: [2, 4.5], n: 1100 },
+    coralsand: { base: '#ebdfcf', dots: ['#f8f1e6', '#d9c6ad', '#f2c9c0', '#fffaf2', '#cdb594'], size: [1.2, 3.4], n: 2000 },
   }[kind] ?? { base: '#ddd', dots: ['#ccc'], size: [1, 2], n: 500 }
   ctx.fillStyle = conf.base
   ctx.fillRect(0, 0, 256, 256)

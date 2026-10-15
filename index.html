@@ -12,10 +12,19 @@
     <meta name="theme-color" content="#06191d" media="(prefers-color-scheme: dark)" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 16c5-7 13-8 19-2l5-4v12l-5-4c-6 6-14 5-19-2z' fill='%23e0452b'/%3E%3C/svg%3E" />
     <!-- Шрифты свои (src/fonts.css): с Google Fonts они приходили через секунды и подменялись уже после интро -->
-    <!-- Кадры интро-погружения: фон и передний план с кораллами -->
+    <!-- Кадры интро-погружения: фон и передний план с кораллами (свой набор для портретного и альбомного экрана) -->
     <link rel="preload" as="image" href="/img/hero-water.jpg" fetchpriority="high" />
-    <link rel="preload" as="image" href="/img/coral-side.webp" fetchpriority="high" />
-    <link rel="preload" as="image" href="/img/coral-bed.webp" fetchpriority="high" />
+    <link rel="preload" as="image" href="/img/dive/hero-water-dof.webp" fetchpriority="high" />
+    <link rel="preload" as="image" href="/img/dive/near-r-tall.webp" media="(max-aspect-ratio: 1/1)" />
+    <link rel="preload" as="image" href="/img/dive/near-l-tall.webp" media="(max-aspect-ratio: 1/1)" />
+    <link rel="preload" as="image" href="/img/dive/near-b-tall.webp" media="(max-aspect-ratio: 1/1)" />
+    <link rel="preload" as="image" href="/img/dive/mid-r-tall.webp" media="(max-aspect-ratio: 1/1)" />
+    <link rel="preload" as="image" href="/img/dive/mid-l-tall.webp" media="(max-aspect-ratio: 1/1)" />
+    <link rel="preload" as="image" href="/img/dive/near-r-wide.webp" media="(min-aspect-ratio: 1001/1000)" />
+    <link rel="preload" as="image" href="/img/dive/near-l-wide.webp" media="(min-aspect-ratio: 1001/1000)" />
+    <link rel="preload" as="image" href="/img/dive/near-b-wide.webp" media="(min-aspect-ratio: 1001/1000)" />
+    <link rel="preload" as="image" href="/img/dive/mid-r-wide.webp" media="(min-aspect-ratio: 1001/1000)" />
+    <link rel="preload" as="image" href="/img/dive/mid-l-wide.webp" media="(min-aspect-ratio: 1001/1000)" />
   </head>
   <body>
     <div id="root"></div>

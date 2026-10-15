@@ -17,12 +17,7 @@ import { settle, startPreload, usePreload } from '../preload.js'
 import { shop } from '../data.js'
 import tracks from '../fishTracks.json'
 import { asset } from '../asset.js'
-
-// Intro timeline, seconds from the moment the dive starts. The name, kicker and
-// plaque wait for the corals to part; the fish only starts once all of them have
-// settled, since starting a clip costs a phone a few frames.
-const T = { logo: 0.95, logoDur: 1.9, kicker: 2.05, plaque: 2.7, fish: 4.2, hint: 4.4 }
-const SOFT = [0.22, 1, 0.36, 1]
+import { INTRO as T, introVars } from '../intro.js'
 
 /* ───────── Dive-in ─────────
  * One "travel" value (0 → 1) moves the camera forward by DIVE.distance. Every layer
@@ -30,26 +25,34 @@ const SOFT = [0.22, 1, 0.36, 1]
  * which is exactly how a forward dolly projects: near corals swell and rush out of
  * frame, mid corals drift past slower, the far plate barely grows.
  *
- * The layers move as Web Animations, which run on the compositor: whatever the main
- * thread is busy with on a phone (decoding, the fish clip starting), the dive can't
- * stutter. Travel is sampled at even time steps, so the easing lives in the keyframes.
+ * Built so that a phone only ever moves finished bitmaps around:
+ * - the layers move as Web Animations, which run on the compositor; travel is sampled
+ *   at even time steps, so the easing lives in the keyframes;
+ * - blur and colour are baked into the coral and depth-of-field images
+ *   (sources/coral/bake-dive.mjs, one set per layout). A CSS blur on a layer scaled up
+ *   to 20× has to be repainted at that size, which can stall a phone (Safari paints on
+ *   the main thread) for a second or two right after the corals;
+ * - corals stop growing at MAX_SCALE, long after they left the frame, and switch off.
  */
 const DIVE = { duration: 3.6, distance: 0.82, ease: [0.35, 0.1, 0.15, 1] }
-const SIDE = asset('img/coral-side.webp') // tall cluster: frames the gap on the left and right
-const BED = asset('img/coral-bed.webp') // low heads along the bottom
-const INTRO_IMAGES = [asset('img/hero-water.jpg'), SIDE, BED]
+const TALL = typeof window !== 'undefined' && window.matchMedia('(max-aspect-ratio: 1/1)').matches
+const diveImg = (key, layout) => asset(`img/dive/${key}-${layout}.webp`)
+const DOF = asset('img/dive/hero-water-dof.webp')
 const MAX_WAIT_MS = 2500 // never keep the scene frozen longer than this on a slow network
 const FONT_GRACE_MS = 800 // how long the frames, once ready, may wait for the fonts
+const MAX_SCALE = 8
 
 const PLATE_DEPTH = 12
 // Far → near. Depth 1 = where the camera ends up after travelling DIVE.distance + a bit.
+// side: tall cluster framing the gap on the left and right; bed: low heads along the bottom.
 const CORALS = [
-  { key: 'mid-l', depth: 1.45, src: BED, cls: 'is-mid is-flip c-mid-l' },
-  { key: 'mid-r', depth: 1.35, src: BED, cls: 'is-mid c-mid-r' },
-  { key: 'near-b', depth: 0.95, src: BED, cls: 'is-near c-near-b' },
-  { key: 'near-l', depth: 0.9, src: SIDE, cls: 'is-near is-flip c-near-l' },
-  { key: 'near-r', depth: 0.86, src: SIDE, cls: 'is-near c-near-r' },
+  { key: 'mid-l', depth: 1.45, base: 'bed' },
+  { key: 'mid-r', depth: 1.35, base: 'bed' },
+  { key: 'near-b', depth: 0.95, base: 'bed' },
+  { key: 'near-l', depth: 0.9, base: 'side' },
+  { key: 'near-r', depth: 0.86, base: 'side' },
 ]
+const INTRO_IMAGES = [asset('img/hero-water.jpg'), DOF, ...CORALS.map((c) => diveImg(c.key, TALL ? 'tall' : 'wide'))]
 const project = (depth) => (t) => depth / (depth - DIVE.distance * t)
 const plateScale = project(PLATE_DEPTH)
 const clamp01 = (v) => Math.min(1, Math.max(0, v))
@@ -72,13 +75,17 @@ const diveEase = cubicBezier(...DIVE.ease)
 const TRAVEL = Array.from({ length: 41 }, (_, i) => diveEase(i / 40))
 const diveFrames = (fn) => TRAVEL.map(fn)
 
-/** Scale with the camera, then fade out on the last stretch while rushing out of frame. */
+/** Scale with the camera, fade out on the last stretch while rushing out of frame, switch off. */
 function coralFrames(depth) {
   const p = project(depth)
-  const end = p(1)
+  const end = Math.min(MAX_SCALE, p(1))
   const from = 1 + (end - 1) * 0.55
   const to = 1 + (end - 1) * 0.92
-  return diveFrames((t) => ({ transform: `scale(${p(t).toFixed(4)})`, opacity: clamp01((to - p(t)) / (to - from)) }))
+  return diveFrames((t) => {
+    const s = Math.min(end, p(t))
+    const opacity = clamp01((to - s) / (to - from))
+    return { transform: `scale(${s.toFixed(4)})`, opacity, visibility: opacity > 0 ? 'visible' : 'hidden' }
+  })
 }
 
 /** Share of the dive's duration at which travel reaches `t` (for the ?dive= QA hook). */
@@ -108,27 +115,24 @@ function fontsReady() {
   return Promise.all(INTRO_FONTS.map((f) => document.fonts.load(f, 'Мир аквариумов 0'))).catch(() => {})
 }
 
-// The name ripples in through an SVG filter that is redrawn every frame: cheap on a
-// desktop, but phones (Safari above all) render it on the main thread. Touch screens
-// get a plain fade and settle instead.
-const rippleLogo = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+// Mouse-only effects. The name ripples in through an SVG filter that is redrawn every
+// frame: cheap on a desktop, but phones (Safari above all) render it on the main thread,
+// so touch screens get a CSS fade and settle instead. The torch follows the mouse and
+// blends over the whole hero (mix-blend-mode), which only costs a phone.
+const finePointer = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
 const rand = (i, salt) => {
   const x = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453
   return x - Math.floor(x)
 }
+// CSS animations (styles.css): they keep rising whatever the main thread is doing.
 const bubbles = Array.from({ length: 14 }, (_, i) => ({
-  left: 3 + rand(i, 1) * 94,
-  size: 4 + rand(i, 2) * 10,
-  duration: 8 + rand(i, 3) * 8,
-  delay: -rand(i, 4) * 12,
-  drift: (rand(i, 5) - 0.5) * 50,
+  left: `${3 + rand(i, 1) * 94}%`,
+  '--size': `${4 + rand(i, 2) * 10}px`,
+  '--dur': `${8 + rand(i, 3) * 8}s`,
+  '--delay': `${-rand(i, 4) * 12}s`,
+  '--drift': `${(rand(i, 5) - 0.5) * 50}px`,
 }))
-
-const item = {
-  hidden: { opacity: 0, y: 10 },
-  shown: { opacity: 1, y: 0, transition: { duration: 0.9, ease: SOFT } },
-}
 
 export default function Hero({ onStart }) {
   const ref = useRef(null)
@@ -216,19 +220,10 @@ export default function Hero({ onStart }) {
   const bgY = useTransform(scrollYProgress, [0, 1], ['0%', '18%'])
   const bgScale = useTransform(scrollYProgress, [0, 1], [1.04, 1.14])
   const titleY = useTransform(scrollYProgress, [0, 1], [0, -120])
+  // The plaque fades on scroll by itself (an ancestor with opacity < 1 would switch off
+  // its backdrop blur); its entrance is a CSS animation that overrides this meanwhile.
   const fade = useTransform(scrollYProgress, [0, 0.55], [1, 0])
   const hintFade = useTransform(scrollYProgress, [0, 0.1], [1, 0])
-
-  // Plaque: intro entrance × scroll fade on the plaque itself. An ancestor with
-  // opacity < 1 would switch off its backdrop blur (it becomes a backdrop root).
-  const plaqueIn = useMotionValue(reduce ? 1 : 0)
-  const plaqueOpacity = useTransform(() => fade.get() * plaqueIn.get())
-  const plaqueY = useTransform(plaqueIn, [0, 1], [18, 0])
-  useEffect(() => {
-    if (!play || reduce) return
-    const a = animate(plaqueIn, 1, { delay: T.plaque, duration: 1.2, ease: SOFT })
-    return () => a.stop()
-  }, [play, reduce, plaqueIn])
 
   const mx = useMotionValue(-400)
   const my = useMotionValue(-400)
@@ -241,24 +236,23 @@ export default function Hero({ onStart }) {
     my.set(e.clientY - r.top)
   }
 
-  // ── Logo: appears from transparency through a fine ripple (SVG displacement;
-  // a plain fade on touch screens, see rippleLogo).
+  // ── Logo: appears from transparency through a fine ripple (SVG displacement). On
+  // touch screens it is a CSS fade instead (see finePointer): no style is driven here.
   const reveal = useMotionValue(reduce ? 1 : 0)
   const turbRef = useRef(null)
   const dispRef = useRef(null)
   const logoOpacity = useTransform(reveal, [0, 0.55, 1], [0, 0.85, 1])
   const logoScale = useTransform(reveal, [0, 1], [1.07, 1])
   const logoFilter = useTransform(reveal, (p) =>
-    !rippleLogo || p >= 0.999 ? 'none' : `url(#mir-aquariumov-ripple) blur(${((1 - p) * 5).toFixed(2)}px)`,
+    p >= 0.999 ? 'none' : `url(#mir-aquariumov-ripple) blur(${((1 - p) * 5).toFixed(2)}px)`,
   )
   useMotionValueEvent(reveal, 'change', (p) => {
-    if (!rippleLogo) return
     const k = 1 - p
     dispRef.current?.setAttribute('scale', (46 * k ** 1.3).toFixed(2))
     turbRef.current?.setAttribute('baseFrequency', `${(0.01 + 0.016 * k).toFixed(4)} ${(0.06 + 0.1 * k).toFixed(4)}`)
   })
   useEffect(() => {
-    if (!play || reduce) return
+    if (!play || reduce || !finePointer) return
     const a = animate(reveal, 1, { delay: T.logo, duration: T.logoDur, ease: [0.22, 1, 0.36, 1] })
     return () => a.stop()
   }, [play, reduce, reveal])
@@ -268,38 +262,26 @@ export default function Hero({ onStart }) {
       id="top"
       ref={ref}
       className="hero"
-      onPointerMove={onPointerMove}
+      style={introVars}
+      onPointerMove={finePointer ? onPointerMove : undefined}
       data-intro={!play ? 'waiting' : diveDone ? 'done' : 'diving'}
     >
       {/* Far plate: the reef the camera glides towards. */}
       <div ref={cameraRef} className="hero-camera" style={{ transform: `scale(${plateScale(reduce ? 1 : 0)})` }}>
         <motion.div className="hero-media" style={{ y: bgY, scale: bgScale }}>
           <img src={asset('img/hero-water.jpg')} alt="" fetchPriority="high" />
-          {/* Depth of field: the same plate, blurred, visible only towards the edges (corals)… */}
-          <img src={asset('img/hero-water.jpg')} alt="" className="hero-dof" aria-hidden />
+          {/* Depth of field: the plate blurred, visible only towards the edges (corals)… */}
+          <img src={DOF} alt="" className="hero-dof" aria-hidden />
           {/* …and almost up to the centre at the start of the dive, fading as the camera moves in. */}
-          {!reduce && <img ref={dofRef} src={asset('img/hero-water.jpg')} alt="" className="hero-dof is-start" aria-hidden />}
+          {!reduce && <img ref={dofRef} src={DOF} alt="" className="hero-dof is-start" aria-hidden />}
         </motion.div>
       </div>
-      <motion.div className="hero-torch" style={{ background: torch }} aria-hidden />
+      {finePointer && <motion.div className="hero-torch" style={{ background: torch }} aria-hidden />}
 
       {!reduce && (
         <div className="bubbles" aria-hidden>
-          {bubbles.map((b, i) => (
-            <motion.span
-              key={i}
-              className="bubble"
-              style={{ left: `${b.left}%`, width: b.size, height: b.size }}
-              animate={{ y: [0, -900], x: [0, b.drift, 0], opacity: [0, 0.9, 0.9, 0] }}
-              transition={{
-                duration: b.duration,
-                delay: b.delay,
-                repeat: Infinity,
-                ease: 'linear',
-                times: [0, 0.1, 0.85, 1],
-                x: { duration: b.duration / 2, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' },
-              }}
-            />
+          {bubbles.map((style, i) => (
+            <span key={i} className="bubble" style={style} />
           ))}
         </div>
       )}
@@ -314,18 +296,11 @@ export default function Hero({ onStart }) {
       </svg>
 
       <motion.div className="hero-center" style={{ y: titleY, opacity: fade }}>
-        <motion.p
-          className="hero-kicker"
-          initial={{ opacity: 0, y: 8 }}
-          animate={play ? { opacity: 1, y: 0 } : undefined}
-          transition={{ delay: reduce ? 0 : T.kicker, duration: 1.1, ease: SOFT }}
-        >
-          Выставка — магазин
-        </motion.p>
+        <p className="hero-kicker intro-in">Выставка — магазин</p>
         <motion.h1
           ref={titleRef}
-          className="hero-name"
-          style={{ opacity: logoOpacity, scale: logoScale, filter: logoFilter }}
+          className={'hero-name' + (finePointer ? '' : ' intro-in')}
+          style={finePointer ? { opacity: logoOpacity, scale: logoScale, filter: logoFilter } : undefined}
           data-testid="hero-name"
         >
           <span className="hero-name-line">Мир</span> <span className="hero-name-line">аквариумов</span>
@@ -338,8 +313,11 @@ export default function Hero({ onStart }) {
           <div ref={deepRef} className="dive-deep" />
           {!diveDone &&
             CORALS.map((c) => (
-              <div key={c.key} ref={(el) => (coralRefs.current[c.key] = el)} className={'dive-coral ' + c.cls}>
-                <img src={c.src} alt="" decoding="async" />
+              <div key={c.key} ref={(el) => (coralRefs.current[c.key] = el)} className={`dive-coral is-${c.base} c-${c.key}`}>
+                <picture>
+                  <source media="(max-aspect-ratio: 1/1)" srcSet={diveImg(c.key, 'tall')} />
+                  <img src={diveImg(c.key, 'wide')} alt="" decoding="async" />
+                </picture>
               </div>
             ))}
           <DiveSnow travel={travel} active={inView && pageVisible} />
@@ -347,28 +325,17 @@ export default function Hero({ onStart }) {
       )}
 
       <div className="hero-bottom wrap">
-        <motion.div
-          className="hero-plaque"
-          style={{ opacity: plaqueOpacity, y: plaqueY }}
-          initial="hidden"
-          animate={play ? 'shown' : 'hidden'}
-          variants={{
-            hidden: {},
-            shown: { transition: { delayChildren: reduce ? 0 : T.plaque + 0.2, staggerChildren: reduce ? 0 : 0.14 } },
-          }}
-        >
-          <motion.p className="hero-lead" variants={item}>
-            Живые рыбы, морские кораллы и всё для аквариума — в одном зале в Чебоксарах.
-          </motion.p>
-          <motion.div className="hero-actions" variants={item}>
+        <motion.div className="hero-plaque intro-in" style={{ opacity: fade }}>
+          <p className="hero-lead intro-in">Живые рыбы, морские кораллы и всё для аквариума — в одном зале в Чебоксарах.</p>
+          <div className="hero-actions intro-in">
             <motion.a href="#builder" className="btn btn-primary" whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}>
               Собрать аквариум
             </motion.a>
             <motion.a href="#booking" className="btn btn-glass" whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}>
               Записаться на выставку
             </motion.a>
-          </motion.div>
-          <motion.ul className="hero-facts" variants={item}>
+          </div>
+          <ul className="hero-facts intro-in">
             <li>
               <span>Адрес</span>
               <a href={shop.routeUrl} target="_blank" rel="noopener">
@@ -379,23 +346,18 @@ export default function Hero({ onStart }) {
               <span>Телефон</span>
               <a href={shop.phoneHref}>{shop.phone}</a>
             </li>
-          </motion.ul>
+          </ul>
         </motion.div>
       </div>
 
       {/* Scroll hint: comes up once the intro has settled, goes as soon as the page moves. */}
       <motion.div className="hero-hint" style={{ opacity: hintFade }} aria-hidden data-testid="scroll-hint">
-        <motion.span
-          className="hero-hint-inner"
-          initial={{ opacity: 0, y: -6 }}
-          animate={play ? { opacity: 1, y: 0 } : undefined}
-          transition={{ delay: reduce ? 0 : T.hint, duration: 1, ease: SOFT }}
-        >
+        <span className="hero-hint-inner intro-in">
           Листайте вниз
           <svg className="hero-hint-arrow" viewBox="0 0 12 18" width="10" height="15">
             <path d="M6 1.5v14M1.5 11 6 15.5 10.5 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-        </motion.span>
+        </span>
       </motion.div>
 
       <svg className="hero-wave" viewBox="0 0 1440 90" preserveAspectRatio="none" aria-hidden>

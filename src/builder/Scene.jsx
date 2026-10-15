@@ -111,6 +111,7 @@ function World({ water, tankId, ground, placed, yawRef, pitchRef, idleRef, selec
         )}
         {has('air') && <Bubbles world={world} kind="air" />}
         {has('filter') && <Bubbles world={world} kind="filter" />}
+        {has('co2') && <Bubbles world={world} kind="co2" />}
         <Rays world={world} />
         <Tank world={world} water={water} />
       </Rig>
@@ -463,6 +464,22 @@ function layout(p, w, model) {
       return { x: -w.W / 2 + 0.12, y: w.waterTop * 0.7, z: -w.D * 0.12, sx: 1, sy: 1, sz: 1, ry: 0, wet: true }
     case 'light':
       return { x: 0, y: w.H, z: 0, sx: w.W * 0.97, sy: 1, sz: w.D * 0.62, ry: 0, wet: false }
+    case 'canister':
+      // Outside: on the floor right of the cabinet; the hoses reach the tank themselves.
+      return { x: w.W / 2 + 0.75, y: -1.6, z: -w.D / 2 + 0.5, sx: 1, sy: 1, sz: 1, ry: 0, wet: false }
+    case 'skimmer': {
+      const z = -w.D / 2 + 0.26
+      const y = w.ground(z) - 0.03
+      return { x: -w.W * 0.2, y, z, sx: 1, sy: Math.max(0.5, w.waterTop - y + 0.15), sz: 1, ry: 0, wet: true }
+    }
+    case 'co2': {
+      const z = w.D / 2 - 0.45
+      return { x: -w.W / 2 + 0.55, y: w.ground(z), z, sx: 1, sy: 1, sz: 1, ry: 0, wet: true }
+    }
+    case 'feeder':
+      return { x: w.W / 2 - 0.45, y: w.H, z: w.D / 2 - 0.2, sx: 1, sy: 1, sz: 1, ry: 0, wet: false }
+    case 'thermo':
+      return { x: -w.W / 2 + 0.45, y: w.waterTop * 0.35, z: w.D / 2 - 0.06, sx: 1, sy: 1, sz: 1, ry: 0, wet: true }
     default: {
       const x = p.u * (w.W / 2 - 0.5)
       const z = p.v * (w.D / 2 - 0.42)
@@ -581,7 +598,7 @@ function Placed({ p, world, leaving, active, registry, onSelect, setHover, reduc
         }}
         onPointerOut={() => setHover(null)}
       >
-        <model.C seed={p.seed} color={item.color} />
+        <model.C seed={p.seed} color={item.color} world={world} />
       </group>
       <mesh ref={ring} rotation-x={-Math.PI / 2} material={selMat} visible={false} renderOrder={4}>
         <ringGeometry args={[model.radius * 0.86, model.radius, 48]} />
@@ -598,10 +615,10 @@ function Placed({ p, world, leaving, active, registry, onSelect, setHover, reduc
 
 /* ───────── Effects ───────── */
 
-/** Bubble column from the air stone, or a bubbly outflow from the filter. */
+/** Bubble column from the air stone, a bubbly outflow from the filter, or a CO₂ mist. */
 function Bubbles({ world, kind }) {
   const ref = useRef()
-  const n = kind === 'air' ? 30 : 18
+  const n = kind === 'air' ? 30 : kind === 'co2' ? 22 : 18
   const data = useMemo(
     () =>
       Array.from({ length: n }, () => ({
@@ -623,9 +640,15 @@ function Bubbles({ world, kind }) {
     const w = world.current
     const time = state.clock.elapsedTime
     data.forEach((d, i) => {
-      d.k += dt * d.sp * (kind === 'air' ? 0.55 : 0.8)
+      d.k += dt * d.sp * (kind === 'air' ? 0.55 : kind === 'co2' ? 0.3 : 0.8)
       if (d.k > 1) d.k -= 1
-      if (kind === 'air') {
+      if (kind === 'co2') {
+        // Fine mist off the diffuser disc, drifting a little as it rises.
+        const z0 = w.D / 2 - 0.45
+        const y0 = w.ground(z0) + 0.38
+        pos.set(-w.W / 2 + 0.55 + d.x * 0.8 + Math.sin(time * 2 + d.ph) * 0.06 * d.k, y0 + d.k * (w.waterTop - y0 - 0.02), z0 + d.z * 0.8)
+        scl.setScalar(d.s * 0.35)
+      } else if (kind === 'air') {
         const z0 = -w.D / 2 + 0.36
         const y0 = w.ground(z0) + 0.1
         pos.set(-w.W * 0.2 + d.x + Math.sin(time * 3 + d.ph) * 0.04 * d.k, y0 + d.k * (w.waterTop - y0 - 0.02), z0 + d.z)

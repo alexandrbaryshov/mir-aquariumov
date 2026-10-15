@@ -52,4 +52,5 @@ src/
 tests/           Playwright-тесты
 specs/           план тестирования
 sources/coral/   скрипты нарезки кораллов из исходного кадра (Python: numpy, Pillow, scipy)
+                 и bake-dive.mjs — запекает размытие слоёв погружения в public/img/dive/
 ```

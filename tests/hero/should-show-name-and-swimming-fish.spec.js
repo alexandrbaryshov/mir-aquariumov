@@ -21,7 +21,7 @@ test.describe('Главный экран', () => {
     await expect(hint.locator('.hero-hint-inner')).toHaveCSS('opacity', '1', { timeout: 6_000 })
     await page.mouse.wheel(0, 300)
     await expect(hint).toHaveCSS('opacity', '0')
-    await page.mouse.wheel(0, -300)
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
     await expect(hint).toHaveCSS('opacity', '1')
 
     // 2. После интро выплывает рыба

@@ -1,13 +1,14 @@
-import { useId, useMemo, useState } from 'react'
+import { useCallback, useId, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { faq, formatPrice, shop } from '../data.js'
+import ConsentNotice from './ConsentNotice.jsx'
 
 // Set by the GitHub Pages build (see .github/workflows/deploy.yml), where there is no backend.
 const DEMO_BOOKING = import.meta.env.VITE_DEMO_BOOKING === '1'
 
-const topics = ['Записаться на выставку', 'Подбор аквариума', 'Забрать заказ']
+const topics = ['Записаться на выставку', 'Подбор аквариума', 'Заказать обратный звонок']
 // How a topic reads in the confirmation: «Завтра, посещение выставки».
-const topicSummary = { 'Записаться на выставку': 'посещение выставки' }
+const topicSummary = { 'Записаться на выставку': 'посещение выставки', 'Заказать обратный звонок': 'обратный звонок' }
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
 
@@ -28,6 +29,8 @@ export default function Visit({ lines, onBooked }) {
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState('idle') // idle | sending | success | error
   const [result, setResult] = useState(null)
+  const [noticeOpen, setNoticeOpen] = useState(false)
+  const closeNotice = useCallback(() => setNoticeOpen(false), [])
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
 
   const validate = () => {
@@ -234,7 +237,14 @@ export default function Visit({ lines, onBooked }) {
                 <div className="field">
                   <label className="agree">
                     <input id="f-agree" type="checkbox" checked={form.agree} onChange={set('agree')} aria-invalid={!!errors.agree} />
-                    <span>Согласен на обработку имени и телефона для подтверждения визита</span>
+                    <span>
+                      Согласен на{' '}
+                      {/* A button inside the label opens the notice instead of ticking the box. */}
+                      <button type="button" className="agree-link" onClick={() => setNoticeOpen(true)} aria-haspopup="dialog">
+                        обработку персональных данных
+                      </button>{' '}
+                      для подтверждения визита
+                    </span>
                   </label>
                   <FieldError msg={errors.agree} />
                 </div>
@@ -279,6 +289,19 @@ export default function Visit({ lines, onBooked }) {
           </AnimatePresence>
         </div>
       </div>
+
+      <AnimatePresence>
+        {noticeOpen && (
+          <ConsentNotice
+            onClose={closeNotice}
+            onAgree={() => {
+              setForm((f) => ({ ...f, agree: true }))
+              setErrors((e) => ({ ...e, agree: undefined }))
+              closeNotice()
+            }}
+          />
+        )}
+      </AnimatePresence>
     </section>
   )
 }

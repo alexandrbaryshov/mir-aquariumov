@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import {
   motion,
   AnimatePresence,
@@ -10,12 +10,12 @@ import {
 import { useActiveSection, useMediaQuery } from '../hooks.js'
 import { Logo } from './Logo.jsx'
 import { shop } from '../data.js'
+import { INTRO } from '../intro.js'
 
 const nav = [
   { id: 'halls', label: 'Ассортимент' },
   { id: 'shop', label: 'Витрина' },
   { id: 'builder', label: 'Конструктор' },
-  { id: 'steps', label: 'Первый аквариум' },
   { id: 'visit', label: 'Контакты' },
 ]
 const navIds = nav.map((n) => n.id)
@@ -37,7 +37,6 @@ export default function Header({ count, onCartClick, cartButtonRef, theme, setTh
   const [hidden, setHidden] = useState(false)
   const [solid, setSolid] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const wasRevealed = useRef(false)
   const active = useActiveSection(navIds)
 
   useMotionValueEvent(scrollY, 'change', (y) => {
@@ -55,20 +54,15 @@ export default function Header({ count, onCartClick, cartButtonRef, theme, setTh
   return (
     <>
       <motion.header
-        className={'site-header' + (solid ? ' is-solid' : '')}
-        initial={revealed ? false : { y: '-40%', opacity: 0 }}
-        animate={revealed ? { y: hidden ? '-110%' : '0%', opacity: 1 } : { y: '-40%', opacity: 0 }}
+        // First appearance is part of the hero intro (after the name comes in): a slow CSS
+        // fade with a short slide (styles.css, .is-intro), on the compositor like the rest
+        // of the intro. Motion only slides it away and back while scrolling.
+        className={'site-header' + (solid ? ' is-solid' : '') + (revealed ? ' is-intro' : ' is-waiting')}
+        style={{ '--t-header': `${INTRO.header}s` }}
+        initial={false}
+        animate={{ y: hidden ? '-110%' : '0%' }}
         onFocus={() => setHidden(false)}
-        // First appearance is part of the hero intro (after the logo ripples in): a slow
-        // fade with a short slide, not the quick drop used when it hides on scroll.
-        transition={
-          revealed && !wasRevealed.current
-            ? { duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 2.4 }
-            : { type: 'spring', bounce: 0, visualDuration: 0.5 }
-        }
-        onAnimationComplete={() => {
-          if (revealed) wasRevealed.current = true
-        }}
+        transition={{ type: 'spring', bounce: 0, visualDuration: 0.5 }}
       >
         <motion.div className="scroll-progress" style={{ scaleX: progress }} aria-hidden />
         <div className="header-inner">

@@ -18,6 +18,7 @@ sources/*
 !sources/coral/
 sources/coral/*
 !sources/coral/*.py
+!sources/coral/*.mjs
 
 # Python
 __pycache__/
