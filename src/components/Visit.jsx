@@ -2,6 +2,9 @@ import { useId, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { faq, formatPrice, shop } from '../data.js'
 
+// Set by the GitHub Pages build (see .github/workflows/deploy.yml), where there is no backend.
+const DEMO_BOOKING = import.meta.env.VITE_DEMO_BOOKING === '1'
+
 const topics = ['Подбор аквариума', 'Консультация по морскому рифу', 'Забрать заказ']
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -43,6 +46,14 @@ export default function Visit({ lines, onBooked }) {
     }
     setStatus('sending')
     try {
+      if (DEMO_BOOKING) {
+        // Static hosting (GitHub Pages) has no /api/booking: pretend the request went through.
+        await new Promise((r) => setTimeout(r, 600))
+        setResult({ id: 'MA-' + Math.floor(1000 + Math.random() * 9000), cartCount: lines.length })
+        setStatus('success')
+        onBooked()
+        return
+      }
       const res = await fetch('/api/booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -25,7 +25,13 @@ npm run build     # сборка в dist/
 npm run preview   # http://localhost:5180
 ```
 
-Форма записи отправляет `POST /api/booking`. Отвечает на него небольшой фейковый бэкенд, встроенный в dev- и preview-сервер Vite (см. `vite.config.js`). В статической сборке этого эндпоинта нет.
+Форма записи отправляет `POST /api/booking`. Отвечает на него небольшой фейковый бэкенд, встроенный в dev- и preview-сервер Vite (см. `vite.config.js`). В статической сборке этого эндпоинта нет, поэтому сборка для GitHub Pages собирается с `VITE_DEMO_BOOKING=1`: форма проверяет поля и показывает успешную запись, ничего не отправляя.
+
+## Деплой
+
+Сайт публикуется на GitHub Pages workflow-ом [.github/workflows/deploy.yml](.github/workflows/deploy.yml) при каждом пуше в `main`. В настройках репозитория (Settings → Pages → Source) должно быть выбрано **GitHub Actions**.
+
+Pages отдаёт сайт из подпапки `/<имя-репозитория>/`, поэтому сборка идёт с `--base`, а файлы из `public/` в коде подключаются через `asset()` из `src/asset.js`, а не абсолютным путём `/img/...`.
 
 ## Тесты
 

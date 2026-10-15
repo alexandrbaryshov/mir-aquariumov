@@ -1,11 +1,12 @@
 import { useSyncExternalStore } from 'react'
+import { asset } from './asset.js'
 
 /**
  * Downloads the fish clips fully into memory (blob URLs) so a swim-through never
  * stalls mid-pass. Started by the hero once the dive-in frames are decoded, so the
  * clips don't compete with the first screen.
  */
-export const FISH_CLIPS = ['/media/fish-a.mp4', '/media/fish-b.mp4']
+export const FISH_CLIPS = [asset('media/fish-a.mp4'), asset('media/fish-b.mp4')]
 
 let state = { done: false, clips: FISH_CLIPS.slice() }
 const listeners = new Set()

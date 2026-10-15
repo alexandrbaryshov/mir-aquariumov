@@ -16,6 +16,7 @@ import ChromaVideo from './ChromaVideo.jsx'
 import { startPreload, usePreload } from '../preload.js'
 import { shop } from '../data.js'
 import tracks from '../fishTracks.json'
+import { asset } from '../asset.js'
 
 // Intro timeline, seconds from the moment the dive starts. The name, kicker and
 // plaque keep their original entrance; they simply wait for the corals to part.
@@ -28,9 +29,9 @@ const T = { logo: 0.95, logoDur: 1.9, kicker: 2.05, plaque: 2.65, fish: 3.6 }
  * frame, mid corals drift past slower, the far plate barely grows.
  */
 const DIVE = { duration: 3.6, distance: 0.82, ease: [0.35, 0.1, 0.15, 1] }
-const SIDE = '/img/coral-side.webp' // tall cluster: frames the gap on the left and right
-const BED = '/img/coral-bed.webp' // low heads along the bottom
-const INTRO_IMAGES = ['/img/hero-water.jpg', SIDE, BED]
+const SIDE = asset('img/coral-side.webp') // tall cluster: frames the gap on the left and right
+const BED = asset('img/coral-bed.webp') // low heads along the bottom
+const INTRO_IMAGES = [asset('img/hero-water.jpg'), SIDE, BED]
 const MAX_WAIT_MS = 2500 // never keep the scene frozen longer than this on a slow network
 
 const PLATE_DEPTH = 12
@@ -179,9 +180,9 @@ export default function Hero({ onStart }) {
       {/* Far plate: the reef the camera glides towards. */}
       <motion.div className="hero-camera" style={{ scale: plateScale, '--dof': dof }}>
         <motion.div className="hero-media" style={{ y: bgY, scale: bgScale }}>
-          <img src="/img/hero-water.jpg" alt="" fetchPriority="high" />
+          <img src={asset('img/hero-water.jpg')} alt="" fetchPriority="high" />
           {/* Depth of field: the same plate, blurred, visible only towards the edges (corals). */}
-          <img src="/img/hero-water.jpg" alt="" className="hero-dof" aria-hidden />
+          <img src={asset('img/hero-water.jpg')} alt="" className="hero-dof" aria-hidden />
         </motion.div>
       </motion.div>
       <motion.div className="hero-torch" style={{ background: torch }} aria-hidden />
@@ -555,7 +556,7 @@ function FishSwim({ heroRef, titleRef, start, reduce }) {
     timer.current = setTimeout(launch, 1400 + Math.random() * 3200)
   }
 
-  if (reduce) return <img src="/img/fish-cutout.png" alt="" className="hero-fish-static" />
+  if (reduce) return <img src={asset('img/fish-cutout.png')} alt="" className="hero-fish-static" />
   if (!pass) return null
 
   return (
