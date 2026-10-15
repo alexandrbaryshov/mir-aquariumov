@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Playwright artifacts
+test-results/
+playwright-report/
+blob-report/
+.playwright-cli/
+
+# QA screenshots, debug scripts and demo recordings (local only, ~140 MB)
+qa/
+
+# Raw generated sources (full-size renders, video takes) — keep only the processing scripts
+sources/*
+!sources/coral/
+sources/coral/*
+!sources/coral/*.py
+
+# Python
+__pycache__/
+*.pyc
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/*
+!.vscode/extensions.json
+.idea/
