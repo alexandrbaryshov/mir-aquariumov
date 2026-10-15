@@ -6,7 +6,8 @@
 - витрина с фильтрами, сортировкой и карточкой товара;
 - корзина с сохранением в `localStorage`;
 - 3D-конструктор аквариума на three.js / react-three-fiber;
-- контакты с картой Яндекса и форма записи на визит.
+- контакты с картой Яндекса и форма записи на визит;
+- последняя страница — фото с выставки с подписями и просмотром на весь экран. Кнопка «Записаться на выставку» на главном экране ведёт сначала сюда, а отсюда — к форме записи.
 
 Учитываются `prefers-reduced-motion` и тёмная тема.
 
@@ -51,6 +52,8 @@ src/
   fonts/         шрифты (Golos Text, JetBrains Mono, Literata), подключены в fonts.css
 tests/           Playwright-тесты
 specs/           план тестирования
-sources/coral/   скрипты нарезки кораллов из исходного кадра (Python: numpy, Pillow, scipy)
-                 и bake-dive.mjs — запекает размытие слоёв погружения в public/img/dive/
+sources/coral/   make_reef.py — готовит кораллы погружения (public/img/reef/, свой набор для
+                 телефона и для десктопа) из сгенерированных вырезок sources/coral/reef/
+                 (Python: numpy, Pillow, scipy); bake-dive.mjs — запекает размытый фон в public/img/dive/
+vistavka/        исходные фото с выставки; на сайте — public/img/expo/
 ```

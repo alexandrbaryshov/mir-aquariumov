@@ -19,6 +19,8 @@ sources/*
 sources/coral/*
 !sources/coral/*.py
 !sources/coral/*.mjs
+# Original exhibition photos; the site uses the WebP copies in public/img/expo/
+vistavka/
 
 # Python
 __pycache__/

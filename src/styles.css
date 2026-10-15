@@ -692,90 +692,93 @@ p {
   width: 100%;
   height: 100%;
 }
+/* The resting reef: under the name and the fish, above the plate. */
+.reef {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
 /* Each layer is a full-frame box scaled about the vanishing point. */
-.dive-coral {
+.reef-layer {
   position: absolute;
   inset: 0;
   transform-origin: 50% 45%;
+  will-change: transform;
+}
+.dive-coral {
   will-change: transform, opacity;
 }
-/* The images are pre-blurred, tinted and mirrored (sources/coral/bake-dive.mjs) and carry a
-   32 px transparent margin for the blur to spread into. The box keeps the original
-   coral's proportions and placement; the scale grows the picture by that margin, so
-   the coral itself lands exactly where the unpadded image used to be. */
-.dive-coral img {
+.reef-layer img {
   position: absolute;
   max-width: none;
-  height: auto;
-  object-fit: fill;
-  transform: scale(var(--kx), var(--ky));
 }
-.dive-coral.is-side img {
-  aspect-ratio: 526 / 601;
-  --kx: calc(590 / 526);
-  --ky: calc(665 / 601);
-}
-.dive-coral.is-bed img {
-  aspect-ratio: 717 / 311;
-  --kx: calc(781 / 717);
-  --ky: calc(375 / 311);
-}
-/* Side clusters frame a gap left and right, a low bed lies along the bottom:
-   the camera starts inside the reef and glides out through the gap. */
-.c-near-r img {
-  height: 112vh;
-  right: -20vh;
-  top: 2vh;
-}
+/* A half-ring around the name: tall clusters along the left and right edges, low mounds
+   in the bottom corners. Each image is tallest on its outer side and slopes down
+   towards the middle, which stays open. The aspect ratios are those of the files. */
 .c-near-l img {
-  height: 104vh;
-  left: -19vh;
-  top: 9vh;
-}
-.c-near-b img {
-  width: 92vw;
-  left: 4vw;
-  bottom: -20vh;
-}
-.c-mid-r img {
-  width: 40vw;
-  right: -4vw;
-  bottom: -2vh;
-}
-.c-mid-l img {
-  width: 46vw;
+  height: min(96vh, 62vw);
+  aspect-ratio: 962 / 1400;
   left: -6vw;
-  bottom: -4vh;
+  bottom: -6vh;
 }
+.c-near-r img {
+  height: min(92vh, 58vw);
+  aspect-ratio: 1052 / 1400;
+  right: -6vw;
+  bottom: -6vh;
+}
+.c-rest-l img {
+  height: min(42vh, 28vw);
+  aspect-ratio: 1300 / 664;
+  left: -1vw;
+  bottom: -5vh;
+}
+.c-rest-r img {
+  height: min(44vh, 29vw);
+  aspect-ratio: 1300 / 755;
+  right: -1vw;
+  bottom: -5vh;
+}
+/* Portrait screens get their own files: the corner mounds are cut down to their outer part. */
 @media (max-aspect-ratio: 1/1) {
-  .c-near-r img {
+  /* Here the plaque spans the whole width and its glass is thin (the fish shows through
+     it): the mounds rise along the edges between the name and the plaque and melt away
+     before they reach its text. */
+  .reef {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 340px), transparent calc(100% - 250px));
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 340px), transparent calc(100% - 250px));
+  }
+  .reef-layer img {
     height: auto;
-    width: 120vw;
-    right: -46vw;
-    top: auto;
-    bottom: 3vh;
   }
   .c-near-l img {
-    height: auto;
-    width: 110vw;
-    left: -42vw;
-    top: auto;
-    bottom: 9vh;
+    width: min(64vw, 30vh);
+    aspect-ratio: 605 / 880;
+    left: -8vw;
+    bottom: 2vh;
   }
-  .c-near-b img {
-    width: 170vw;
-    left: -35vw;
-    bottom: -3vh;
+  .c-near-r img {
+    width: min(62vw, 29vh);
+    aspect-ratio: 661 / 880;
+    right: -8vw;
+    bottom: 2vh;
   }
-  .c-mid-r img {
-    width: 74vw;
-    right: -22vw;
-    bottom: 15vh;
+  /* These files hold only the upper part of the mounds: they hang from the top. */
+  .c-rest-l img {
+    width: min(80vw, 37vh);
+    aspect-ratio: 860 / 496;
+    left: -8vw;
+    top: 55vh;
+    bottom: auto;
   }
-  .c-mid-l img {
-    width: 84vw;
-    left: -22vw;
-    bottom: 13vh;
+  .c-rest-r img {
+    width: min(74vw, 34vh);
+    aspect-ratio: 860 / 564;
+    right: -8vw;
+    top: 53vh;
+    bottom: auto;
   }
 }
 /* ── Hero intro ──
@@ -2564,6 +2567,248 @@ p {
 }
 .success p {
   color: var(--ink-2);
+}
+
+/* ───────────── Expo ───────────── */
+/* The last page: photos from the exhibition on a deep-water wall. */
+.expo {
+  padding-block: clamp(80px, 10vw, 130px);
+  background: var(--deep);
+  color: #e6f1ee;
+}
+.expo .section-title em {
+  color: #7fd8df;
+}
+.expo .eyebrow {
+  color: #ff8a70;
+}
+.expo-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 30rem);
+  align-items: end;
+  gap: 18px 48px;
+}
+.expo-head .eyebrow {
+  grid-column: 1 / -1;
+  margin-bottom: -2px;
+}
+.expo-lead {
+  color: #a9c6c4;
+}
+.expo-grid {
+  display: grid;
+  gap: clamp(28px, 3vw, 40px);
+  margin-top: clamp(36px, 5vw, 64px);
+}
+/* A justified row: each photo grows in proportion to its aspect ratio, so every
+   photo in the row ends up the same height without cropping. */
+.expo-row {
+  display: flex;
+  gap: clamp(14px, 1.6vw, 22px);
+}
+.expo-photo {
+  flex: var(--ar) 1 0;
+  min-width: 0;
+  margin: 0;
+}
+.expo-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: zoom-in;
+}
+.expo-open img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: var(--ar);
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (hover: hover) {
+  .expo-open:hover img {
+    transform: scale(1.04);
+  }
+}
+.expo-caption {
+  display: grid;
+  gap: 4px;
+  padding: 14px 4px 0;
+}
+.expo-zone {
+  color: #7fd8df;
+}
+.expo-title {
+  font-family: var(--serif);
+  font-size: clamp(1.1rem, 1.5vw, 1.35rem);
+  font-weight: 500;
+  line-height: 1.2;
+}
+.expo-text {
+  color: #a9c6c4;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.expo-cta {
+  flex: 1.6 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: clamp(24px, 3vw, 40px);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+/* The address sits at the top of the tile, the invitation at the bottom. */
+.expo-cta-where {
+  margin-bottom: auto;
+  padding-bottom: 24px;
+  color: #7fd8df;
+  text-decoration: none;
+}
+.expo-cta-where:hover {
+  color: #e6f1ee;
+}
+.expo-cta-title {
+  font-family: var(--serif);
+  font-size: clamp(1.6rem, 2.6vw, 2.3rem);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+}
+.expo-cta-text {
+  color: #a9c6c4;
+}
+.expo-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 22px;
+  margin-top: 10px;
+}
+.expo-cta-phone {
+  text-decoration: none;
+  border-bottom: 1px solid rgba(230, 241, 238, 0.3);
+}
+.expo-cta-phone:hover {
+  border-bottom-color: currentColor;
+}
+/* Two columns: one height for all photos, the wide reef shot spans both. */
+@media (max-width: 1000px) {
+  .expo-head {
+    grid-template-columns: 1fr;
+  }
+  .expo-grid,
+  .expo-row {
+    display: contents;
+  }
+  .expo .wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px 16px;
+  }
+  .expo-head {
+    grid-column: 1 / -1;
+    margin-bottom: 8px;
+  }
+  .expo-photo.is-wide {
+    grid-column: 1 / -1;
+  }
+  .expo-open img {
+    aspect-ratio: 5 / 4;
+  }
+  .expo-photo.is-wide .expo-open img {
+    aspect-ratio: var(--ar);
+  }
+}
+@media (max-width: 600px) {
+  .expo .wrap {
+    grid-template-columns: 1fr;
+  }
+  .expo-open img,
+  .expo-photo.is-wide .expo-open img {
+    aspect-ratio: var(--ar-m);
+  }
+}
+
+/* Lightbox */
+.lightbox {
+  position: relative;
+  width: min(1100px, 100%);
+  max-height: calc(100svh - 32px);
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--deep);
+  color: #e6f1ee;
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.6);
+}
+.lightbox-media {
+  grid-column: 1 / -1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  background: #041a1f;
+}
+.lightbox-media img {
+  max-width: 100%;
+  max-height: calc(100svh - 32px - 150px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  touch-action: pan-y;
+  user-select: none;
+}
+.lightbox-caption {
+  display: grid;
+  gap: 4px;
+  padding: 18px 24px 22px;
+}
+.lightbox-caption .mono {
+  color: #7fd8df;
+}
+.lightbox-caption strong {
+  font-family: var(--serif);
+  font-size: clamp(1.2rem, 2vw, 1.6rem);
+  font-weight: 500;
+  line-height: 1.15;
+}
+.lightbox-text {
+  color: #a9c6c4;
+  font-size: 0.95rem;
+}
+.lightbox-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 24px 0 0;
+}
+.lightbox .icon-btn {
+  background: transparent;
+  border-color: rgba(230, 241, 238, 0.3);
+  color: inherit;
+}
+.lightbox .dialog-close {
+  background: rgba(4, 26, 31, 0.6);
+  backdrop-filter: blur(6px);
+}
+@media (max-width: 600px) {
+  .lightbox-caption {
+    grid-column: 1 / -1;
+    padding: 16px 18px 6px;
+  }
+  .lightbox-nav {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    padding: 0 18px 16px;
+  }
 }
 
 /* ───────────── Footer ───────────── */

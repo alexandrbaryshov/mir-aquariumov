@@ -25,6 +25,7 @@ export default function Footer() {
             <a href="#shop">Витрина</a>
             <a href="#builder">Конструктор</a>
             <a href="#visit">Контакты</a>
+            <a href="#expo">Выставка</a>
           </nav>
           <motion.button
             type="button"
@@ -61,8 +62,8 @@ export default function Footer() {
         </motion.p>
 
         <p className="footer-small">
-          © 2026 «{shop.name}», {shop.addressFull}. Фотографии иллюстративные, не из магазина. Цены
-          ориентировочные — наличие и стоимость уточняйте по телефону.
+          © 2026 «{shop.name}», {shop.addressFull}. Фотографии в каталоге иллюстративные, снимки в разделе
+          «Выставка» — с нашей выставки. Цены ориентировочные — наличие и стоимость уточняйте по телефону.
         </p>
       </div>
     </footer>

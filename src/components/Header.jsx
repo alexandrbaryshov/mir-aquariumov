@@ -17,6 +17,7 @@ const nav = [
   { id: 'shop', label: 'Витрина' },
   { id: 'builder', label: 'Конструктор' },
   { id: 'visit', label: 'Контакты' },
+  { id: 'expo', label: 'Выставка' },
 ]
 const navIds = nav.map((n) => n.id)
 

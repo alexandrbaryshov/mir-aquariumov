@@ -28,15 +28,16 @@ import { INTRO as T, introVars } from '../intro.js'
  * Built so that a phone only ever moves finished bitmaps around:
  * - the layers move as Web Animations, which run on the compositor; travel is sampled
  *   at even time steps, so the easing lives in the keyframes;
- * - blur and colour are baked into the coral and depth-of-field images
- *   (sources/coral/bake-dive.mjs, one set per layout). A CSS blur on a layer scaled up
- *   to 20× has to be repainted at that size, which can stall a phone (Safari paints on
- *   the main thread) for a second or two right after the corals;
+ * - the depth-of-field blur is baked into an image (sources/coral/bake-dive.mjs). A CSS
+ *   blur on a scaled layer has to be repainted at that size, which can stall a phone
+ *   (Safari paints on the main thread);
+ * - the corals are sharp cutouts sized per layout (sources/coral/make_reef.py): a phone
+ *   downloads about half of what a desktop does;
  * - corals stop growing at MAX_SCALE, long after they left the frame, and switch off.
  */
 const DIVE = { duration: 3.6, distance: 0.82, ease: [0.35, 0.1, 0.15, 1] }
 const TALL = typeof window !== 'undefined' && window.matchMedia('(max-aspect-ratio: 1/1)').matches
-const diveImg = (key, layout) => asset(`img/dive/${key}-${layout}.webp`)
+const reefImg = (key, layout) => asset(`img/reef/${key}-${layout}.webp`)
 const DOF = asset('img/dive/hero-water-dof.webp')
 const MAX_WAIT_MS = 2500 // never keep the scene frozen longer than this on a slow network
 const FONT_GRACE_MS = 800 // how long the frames, once ready, may wait for the fonts
@@ -44,18 +45,25 @@ const MAX_SCALE = 8
 
 const PLATE_DEPTH = 12
 // Far → near. Depth 1 = where the camera ends up after travelling DIVE.distance + a bit.
-// side: tall cluster framing the gap on the left and right; bed: low heads along the bottom.
+// The reef only lines the left and right edges and dips at the bottom, like a half-ring
+// around the name: nothing ever crosses the middle of the frame.
+// near: tall clusters the camera starts between; they part to the sides and leave.
+// rest: low mounds in the bottom corners the camera glides up to; they stay on the page.
 const CORALS = [
-  { key: 'mid-l', depth: 1.45, base: 'bed' },
-  { key: 'mid-r', depth: 1.35, base: 'bed' },
-  { key: 'near-b', depth: 0.95, base: 'bed' },
-  { key: 'near-l', depth: 0.9, base: 'side' },
-  { key: 'near-r', depth: 0.86, base: 'side' },
+  { key: 'near-l', depth: 0.92 },
+  { key: 'near-r', depth: 0.88 },
 ]
-const INTRO_IMAGES = [asset('img/hero-water.jpg'), DOF, ...CORALS.map((c) => diveImg(c.key, TALL ? 'tall' : 'wide'))]
+const REST = [
+  { key: 'rest-l', depth: 6 },
+  { key: 'rest-r', depth: 6 },
+]
+const layoutName = TALL ? 'tall' : 'wide'
+const INTRO_IMAGES = [asset('img/hero-water.jpg'), DOF, ...[...REST, ...CORALS].map((c) => reefImg(c.key, layoutName))]
 const project = (depth) => (t) => depth / (depth - DIVE.distance * t)
 const plateScale = project(PLATE_DEPTH)
 const clamp01 = (v) => Math.min(1, Math.max(0, v))
+/** A resting layer ends the dive at its own size: it starts smaller, further away. */
+const restScale = (depth) => (t) => project(depth)(t) / project(depth)(1)
 
 /** cubic-bezier(x1, y1, x2, y2) as a function of time, solved by bisection. */
 function cubicBezier(x1, y1, x2, y2) {
@@ -184,6 +192,7 @@ export default function Hero({ onStart }) {
   const dofRef = useRef(null)
   const deepRef = useRef(null)
   const coralRefs = useRef({})
+  const restRefs = useRef({})
   const travel = useMotionValue(reduce ? 1 : 0)
   useEffect(() => {
     if (!play) return
@@ -197,6 +206,7 @@ export default function Hero({ onStart }) {
       [cameraRef.current, diveFrames((t) => ({ transform: `scale(${plateScale(t).toFixed(4)})` }))],
       [dofRef.current, diveFrames((t) => ({ opacity: 1 - t }))],
       [deepRef.current, diveFrames((t) => ({ opacity: clamp01(1 - t / 0.7) }))],
+      ...REST.map((c) => [restRefs.current[c.key], diveFrames((t) => ({ transform: `scale(${restScale(c.depth)(t).toFixed(4)})` }))]),
       ...CORALS.map((c) => [coralRefs.current[c.key], coralFrames(c.depth)]),
     ]
     const anims = layers.filter(([el]) => el).map(([el, frames]) => el.animate(frames, timing))
@@ -286,6 +296,20 @@ export default function Hero({ onStart }) {
         </div>
       )}
 
+      {/* The corner mounds: part of the dive, then they stay and frame the first screen. */}
+      <div className="reef" aria-hidden>
+        {REST.map((c) => (
+          <div
+            key={c.key}
+            ref={(el) => (restRefs.current[c.key] = el)}
+            className={`reef-layer reef-rest c-${c.key}`}
+            style={reduce ? undefined : { transform: `scale(${restScale(c.depth)(0).toFixed(4)})` }}
+          >
+            <ReefImage name={c.key} />
+          </div>
+        ))}
+      </div>
+
       <FishSwim heroRef={ref} titleRef={titleRef} start={play} reduce={reduce} />
 
       <svg className="sr-filter" aria-hidden width="0" height="0">
@@ -313,11 +337,8 @@ export default function Hero({ onStart }) {
           <div ref={deepRef} className="dive-deep" />
           {!diveDone &&
             CORALS.map((c) => (
-              <div key={c.key} ref={(el) => (coralRefs.current[c.key] = el)} className={`dive-coral is-${c.base} c-${c.key}`}>
-                <picture>
-                  <source media="(max-aspect-ratio: 1/1)" srcSet={diveImg(c.key, 'tall')} />
-                  <img src={diveImg(c.key, 'wide')} alt="" decoding="async" />
-                </picture>
+              <div key={c.key} ref={(el) => (coralRefs.current[c.key] = el)} className={`reef-layer dive-coral c-${c.key}`}>
+                <ReefImage name={c.key} />
               </div>
             ))}
           <DiveSnow travel={travel} active={inView && pageVisible} />
@@ -331,7 +352,8 @@ export default function Hero({ onStart }) {
             <motion.a href="#builder" className="btn btn-primary" whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}>
               Собрать аквариум
             </motion.a>
-            <motion.a href="#booking" className="btn btn-glass" whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}>
+            {/* First the exhibition photos (Expo.jsx); the booking form is one click from there. */}
+            <motion.a href="#expo" className="btn btn-glass" whileHover={{ y: -2 }} whileTap={{ scale: 0.96 }}>
               Записаться на выставку
             </motion.a>
           </div>
@@ -374,6 +396,16 @@ export default function Hero({ onStart }) {
         />
       </svg>
     </section>
+  )
+}
+
+/** One coral cutout, in the size made for the current layout (sources/coral/make_reef.py). */
+function ReefImage({ name }) {
+  return (
+    <picture>
+      <source media="(max-aspect-ratio: 1/1)" srcSet={reefImg(name, 'tall')} />
+      <img src={reefImg(name, 'wide')} alt="" decoding="async" />
+    </picture>
   )
 }
 

@@ -9,7 +9,8 @@ test.describe('Главный экран', () => {
     await expect(page.getByTestId('hero-name')).toHaveCSS('opacity', '1', { timeout: 5_000 })
     await expect(page.locator('.hero-kicker')).toHaveText('Выставка — магазин')
     await expect(page.getByRole('link', { name: 'Собрать аквариум' })).toHaveAttribute('href', '#builder')
-    await expect(page.getByRole('link', { name: 'Записаться на выставку' })).toHaveAttribute('href', '#booking')
+    // Сначала к фото выставки (последний раздел), запись — уже оттуда
+    await expect(page.locator('.hero').getByRole('link', { name: 'Записаться на выставку' })).toHaveAttribute('href', '#expo')
     await expect(page.locator('.hero-actions a')).toHaveCount(2)
     await expect(page.locator('.hero-facts')).toContainText('Чебоксары, просп. Ленина, 27')
     await expect(page.locator('.hero-facts')).toContainText('+7 (8352) 57-19-55')

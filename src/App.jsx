@@ -9,6 +9,7 @@ import Shop from './components/Shop.jsx'
 import Builder from './components/Builder.jsx'
 import Places from './components/Places.jsx'
 import Visit from './components/Visit.jsx'
+import Expo from './components/Expo.jsx'
 import Footer from './components/Footer.jsx'
 import Cart from './components/Cart.jsx'
 
@@ -73,6 +74,7 @@ export default function App() {
         <Builder onAdd={addToCart} cartButtonRef={cartButtonRef} />
         <Places />
         <Visit lines={lines} onBooked={() => setCart([])} />
+        <Expo />
       </main>
       <Footer />
       <Cart open={cartOpen} onClose={() => setCartOpen(false)} lines={lines} setCart={setCart} />
